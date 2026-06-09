@@ -104,6 +104,11 @@ class ApiClient {
     return RouteDetail.fromJson(_decode(res) as Map<String, dynamic>);
   }
 
+  Future<VehiclePosition> tripPosition(String tripId) async {
+    final res = await _client.get(_uri('/trips/$tripId/position'), headers: _headers);
+    return VehiclePosition.fromJson(_decode(res) as Map<String, dynamic>);
+  }
+
   Future<BoardResult> boardTrip(String tripId) async {
     final res = await _client.post(
       _uri('/trips/$tripId/board'),

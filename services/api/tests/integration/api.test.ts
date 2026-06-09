@@ -175,6 +175,15 @@ describe('Mobility: routes, trips, boarding', () => {
     expect((res.json() as unknown[]).length).toBeGreaterThan(0);
   });
 
+  it('returns a live position for a trip', async () => {
+    const trips = (await app.inject({ method: 'GET', url: '/trips' })).json() as Array<{ id: string }>;
+    const res = await app.inject({ method: 'GET', url: `/trips/${trips[0]!.id}/position` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toHaveProperty('lat');
+    expect(res.json()).toHaveProperty('lng');
+    expect(res.json()).toHaveProperty('nextStop');
+  });
+
   it('boards a trip, spending the fare in tokens', async () => {
     const token = await authToken(app, 'boarder@trotxi.com');
     const auth = { authorization: `Bearer ${token}` };

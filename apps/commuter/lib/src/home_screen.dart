@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api_client.dart';
 import 'boarding_pass_screen.dart';
 import 'checkout_screen.dart';
+import 'live_map_screen.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'trip_history_screen.dart';
@@ -74,6 +75,27 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     _refresh();
+  }
+
+  Future<void> _openLiveMap() async {
+    // Track the active ride's vehicle, else the first live/upcoming trip.
+    Trip? trip = _activeRide?.trip;
+    try {
+      if (trip == null) {
+        final trips = await widget.api.upcomingTrips();
+        if (trips.isNotEmpty) trip = trips.first;
+      }
+    } catch (_) {/* fall through */}
+    if (!mounted) return;
+    if (trip == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No live vehicles right now.')),
+      );
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => LiveMapScreen(api: widget.api, trip: trip!)),
+    );
   }
 
   Future<void> _endRide() async {
@@ -155,7 +177,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const _ActionTile(icon: Icons.map_outlined, title: 'Live map', subtitle: 'Track your vehicle in real time (coming soon)'),
+                    _ActionTile(
+                      icon: Icons.map_outlined,
+                      title: 'Live map',
+                      subtitle: 'Track your vehicle in real time',
+                      onTap: _openLiveMap,
+                    ),
                   ],
                 ],
               ),

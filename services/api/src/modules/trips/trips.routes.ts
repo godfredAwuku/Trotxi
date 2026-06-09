@@ -1,13 +1,19 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { AppError } from '../../lib/errors';
 import type { BoardingService } from './boarding.service';
+import type { LivePositionService } from './live.service';
 import type { TripRepository } from './trip.repository';
 
 export async function tripRoutes(
   app: FastifyInstance,
-  opts: { trips: TripRepository; boardings: BoardingService; authGuard: preHandlerHookHandler },
+  opts: {
+    trips: TripRepository;
+    boardings: BoardingService;
+    live: LivePositionService;
+    authGuard: preHandlerHookHandler;
+  },
 ): Promise<void> {
-  const { trips, boardings, authGuard } = opts;
+  const { trips, boardings, live, authGuard } = opts;
 
   app.get('/trips', async (request) => {
     const { routeId } = request.query as { routeId?: string };
@@ -21,6 +27,16 @@ export async function tripRoutes(
       throw AppError.notFound('Trip not found', 'TRIP_NOT_FOUND');
     }
     return trip;
+  });
+
+  // Live (simulated) vehicle position for the map.
+  app.get('/trips/:id/position', async (request) => {
+    const { id } = request.params as { id: string };
+    const position = await live.positionFor(id);
+    if (!position) {
+      throw AppError.notFound('No live position for this trip', 'NO_POSITION');
+    }
+    return position;
   });
 
   app.post('/trips/:id/board', { preHandler: authGuard }, async (request, reply) => {

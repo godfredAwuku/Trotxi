@@ -187,6 +187,33 @@ class BoardingHistoryItem {
       );
 }
 
+class VehiclePosition {
+  VehiclePosition({
+    required this.lat,
+    required this.lng,
+    required this.bearing,
+    required this.nextStop,
+    required this.progress,
+    required this.status,
+  });
+
+  final double lat;
+  final double lng;
+  final double bearing;
+  final String nextStop;
+  final double progress;
+  final String status;
+
+  factory VehiclePosition.fromJson(Map<String, dynamic> json) => VehiclePosition(
+        lat: (json['lat'] as num).toDouble(),
+        lng: (json['lng'] as num).toDouble(),
+        bearing: (json['bearing'] as num).toDouble(),
+        nextStop: json['nextStop'] as String,
+        progress: (json['progress'] as num).toDouble(),
+        status: json['status'] as String,
+      );
+}
+
 /// Current active ride from GET /boardings/active. Null when the rider is idle.
 class ActiveRide {
   ActiveRide({required this.boardingId, required this.trip});
