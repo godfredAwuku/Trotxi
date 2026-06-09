@@ -1,31 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm:*)",
-      "Bash(npx:*)",
-      "Bash(node:*)",
-      "Bash(make:*)",
-      "Bash(git:*)",
-      "Bash(gh:*)",
-      "Bash(flutter:*)",
-      "Bash(dart:*)",
-      "Bash(docker:*)",
-      "Bash(docker compose:*)",
-      "Bash(curl:*)",
-      "Bash(lsof:*)",
-      "Bash(psql:*)",
-      "Bash(ls:*)",
-      "Bash(cat:*)",
-      "Bash(grep:*)",
-      "Bash(find:*)",
-      "Bash(mkdir:*)",
-      "Bash(cp:*)",
-      "Bash(mv:*)",
-      "Bash(echo:*)",
-      "Bash(export:*)",
-      "Read(*)",
-      "Edit(*)",
-      "Write(*)"
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "WebFetch",
+      "WebSearch"
     ]
   }
 }

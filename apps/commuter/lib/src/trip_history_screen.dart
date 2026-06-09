@@ -121,9 +121,36 @@ class _HistoryCard extends StatelessWidget {
                 children: [
                   Text(item.routeName ?? 'Trip',
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                  const SizedBox(height: 2),
+                  if (item.origin != null && item.destination != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.trip_origin, size: 12, color: AppColors.primary),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(item.origin!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12.5)),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          child: Icon(Icons.arrow_forward, size: 12, color: AppColors.ink.withValues(alpha: 0.4)),
+                        ),
+                        const Icon(Icons.place, size: 12, color: AppColors.accent),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(item.destination!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12.5)),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 4),
                   Text(dateLabel,
-                      style: TextStyle(color: AppColors.ink.withValues(alpha: 0.55), fontSize: 13)),
+                      style: TextStyle(color: AppColors.ink.withValues(alpha: 0.55), fontSize: 12)),
                 ],
               ),
             ),
