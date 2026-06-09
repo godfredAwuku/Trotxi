@@ -68,7 +68,22 @@ See [apps/commuter/README.md](apps/commuter/README.md). In short: install Flutte
 | GET | `/users/me` | JWT | Current user profile |
 | POST | `/subscriptions` | JWT | Subscribe (commuter_monthly, 100 tokens) |
 | GET | `/subscriptions/me` | JWT | Active subscription + balance |
-| POST | `/subscriptions/redeem` | JWT | Redeem token(s) for a trip |
+| POST | `/subscriptions/redeem` | JWT | Redeem token(s) directly |
+| GET | `/routes` | — | List active routes |
+| GET | `/routes/:id` | — | Route detail + ordered stops |
+| GET | `/trips` | — | Upcoming/active trips (`?routeId=`) |
+| GET | `/trips/:id` | — | Trip detail |
+| POST | `/trips/:id/board` | JWT | Board a trip (spends route fare in tokens) |
+| GET | `/boardings/me` | JWT | Rider's boarding history |
+
+### Run with Postgres + seed data
+
+```bash
+make up && cp services/api/.env.example services/api/.env
+# set DATABASE_URL in .env to postgres://trotxi:trotxi@localhost:5432/trotxi
+make migrate && make seed   # schema + demo Accra routes/trips
+make dev
+```
 
 ## Common tasks
 

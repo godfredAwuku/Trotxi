@@ -11,12 +11,21 @@ import { healthRoutes } from './modules/health/health.routes';
 import { subscriptionRoutes } from './modules/subscriptions/subscriptions.routes';
 import { SubscriptionService } from './modules/subscriptions/subscription.service';
 import type { SubscriptionRepository } from './modules/subscriptions/subscription.repository';
+import type { RouteRepository } from './modules/routes/route.repository';
+import { routeRoutes } from './modules/routes/routes.routes';
+import type { TripRepository } from './modules/trips/trip.repository';
+import type { BoardingRepository } from './modules/trips/boarding.repository';
+import { BoardingService } from './modules/trips/boarding.service';
+import { tripRoutes } from './modules/trips/trips.routes';
 import type { UserRepository } from './modules/users/user.repository';
 import { userRoutes } from './modules/users/users.routes';
 
 export interface AppDeps {
   users: UserRepository;
   subscriptions: SubscriptionRepository;
+  routes: RouteRepository;
+  trips: TripRepository;
+  boardings: BoardingRepository;
   jwt: JwtConfig;
   isReady?: () => Promise<boolean>;
   logger?: boolean;
@@ -52,6 +61,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const guard = makeAuthGuard(deps.jwt);
   const authService = new AuthService(deps.users, deps.jwt);
   const subscriptionService = new SubscriptionService(deps.subscriptions);
+  const boardingService = new BoardingService(deps.trips, deps.boardings, subscriptionService);
 
   app.get('/', async () => ({
     service: 'trotxi-api',
@@ -64,6 +74,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(authRoutes, { service: authService });
   await app.register(userRoutes, { users: deps.users, authGuard: guard });
   await app.register(subscriptionRoutes, { service: subscriptionService, authGuard: guard });
+  await app.register(routeRoutes, { repo: deps.routes });
+  await app.register(tripRoutes, { trips: deps.trips, boardings: boardingService, authGuard: guard });
 
   return app;
 }

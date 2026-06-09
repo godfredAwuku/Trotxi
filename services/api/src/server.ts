@@ -1,30 +1,37 @@
-import { existsSync } from 'node:fs';
 import { Pool } from 'pg';
 import { buildApp } from './app';
+import { loadDotenv } from './config/dotenv';
 import { loadEnv } from './config/env';
 
-// Load a local .env if present (Node 20.12+ / 22 built-in). Production injects
-// env vars directly, so a missing .env is fine.
-if (existsSync('.env')) {
-  process.loadEnvFile('.env');
-}
+loadDotenv();
 import { InMemorySubscriptionRepository } from './modules/subscriptions/subscription.repository';
+import { PgSubscriptionRepository } from './modules/subscriptions/subscription.repository.pg';
 import { InMemoryUserRepository } from './modules/users/user.repository';
 import { PgUserRepository } from './modules/users/user.repository.pg';
-import type { UserRepository } from './modules/users/user.repository';
-import type { SubscriptionRepository } from './modules/subscriptions/subscription.repository';
+import { InMemoryRouteRepository } from './modules/routes/route.repository';
+import { PgRouteRepository } from './modules/routes/route.repository.pg';
+import { InMemoryTripRepository } from './modules/trips/trip.repository';
+import { PgTripRepository } from './modules/trips/trip.repository.pg';
+import { InMemoryBoardingRepository } from './modules/trips/boarding.repository';
+import { PgBoardingRepository } from './modules/trips/boarding.repository.pg';
+import type { AppDeps } from './app';
 
 async function main(): Promise<void> {
   const env = loadEnv();
 
-  let users: UserRepository;
-  const subscriptions: SubscriptionRepository = new InMemorySubscriptionRepository();
+  let repos: Pick<AppDeps, 'users' | 'subscriptions' | 'routes' | 'trips' | 'boardings'>;
   let isReady: () => Promise<boolean> = async () => true;
   let pool: Pool | undefined;
 
   if (env.DATABASE_URL) {
     pool = new Pool({ connectionString: env.DATABASE_URL });
-    users = new PgUserRepository(pool);
+    repos = {
+      users: new PgUserRepository(pool),
+      subscriptions: new PgSubscriptionRepository(pool),
+      routes: new PgRouteRepository(pool),
+      trips: new PgTripRepository(pool),
+      boardings: new PgBoardingRepository(pool),
+    };
     isReady = async () => {
       try {
         await pool!.query('SELECT 1');
@@ -35,13 +42,18 @@ async function main(): Promise<void> {
     };
     console.log('Using Postgres repositories');
   } else {
-    users = new InMemoryUserRepository();
+    repos = {
+      users: new InMemoryUserRepository(),
+      subscriptions: new InMemorySubscriptionRepository(),
+      routes: new InMemoryRouteRepository(),
+      trips: new InMemoryTripRepository(),
+      boardings: new InMemoryBoardingRepository(),
+    };
     console.log('Using in-memory repositories (no DATABASE_URL set)');
   }
 
   const app = await buildApp({
-    users,
-    subscriptions,
+    ...repos,
     jwt: { secret: env.JWT_SECRET, expiresIn: env.JWT_EXPIRES_IN },
     isReady,
     logger: true,

@@ -53,5 +53,9 @@ lint: ## Lint the API
 migrate: ## Apply DB migrations (requires DATABASE_URL)
 	cd $(API) && npm run migrate
 
+.PHONY: seed
+seed: ## Seed demo routes/trips/vehicles (requires DATABASE_URL)
+	cd $(API) && npm run seed
+
 .PHONY: check
 check: typecheck lint test ## Run all API quality gates

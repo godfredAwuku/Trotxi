@@ -2,17 +2,13 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
-import { loadEnv } from '../config/env';
+import { requireDatabaseUrl } from '../config/dotenv';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, 'migrations');
 
 async function migrate(): Promise<void> {
-  const env = loadEnv();
-  if (!env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is required to run migrations');
-  }
-  const pool = new Pool({ connectionString: env.DATABASE_URL });
+  const pool = new Pool({ connectionString: requireDatabaseUrl() });
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS _migrations (

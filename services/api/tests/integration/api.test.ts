@@ -3,13 +3,28 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app';
 import { InMemorySubscriptionRepository } from '../../src/modules/subscriptions/subscription.repository';
 import { InMemoryUserRepository } from '../../src/modules/users/user.repository';
+import { InMemoryRouteRepository } from '../../src/modules/routes/route.repository';
+import { InMemoryTripRepository } from '../../src/modules/trips/trip.repository';
+import { InMemoryBoardingRepository } from '../../src/modules/trips/boarding.repository';
 
 async function makeApp(): Promise<FastifyInstance> {
   return buildApp({
     users: new InMemoryUserRepository(),
     subscriptions: new InMemorySubscriptionRepository(),
+    routes: new InMemoryRouteRepository(),
+    trips: new InMemoryTripRepository(),
+    boardings: new InMemoryBoardingRepository(),
     jwt: { secret: 'a'.repeat(32), expiresIn: '1h' },
   });
+}
+
+async function authToken(app: FastifyInstance, email: string): Promise<string> {
+  const reg = await app.inject({
+    method: 'POST',
+    url: '/auth/register',
+    payload: { email, password: 'password123' },
+  });
+  return reg.json().token as string;
 }
 
 describe('API integration', () => {
@@ -117,6 +132,97 @@ describe('API integration', () => {
       headers: { authorization: `Bearer ${token}` },
       payload: { tokens: 1 },
     });
+    expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('Mobility: routes, trips, boarding', () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    app = await makeApp();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('lists active routes (public)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/routes' });
+    expect(res.statusCode).toBe(200);
+    const routes = res.json() as Array<{ name: string }>;
+    expect(routes.length).toBeGreaterThan(0);
+    expect(routes[0]).toHaveProperty('fareTokens');
+  });
+
+  it('returns a route with ordered stops', async () => {
+    const list = await app.inject({ method: 'GET', url: '/routes' });
+    const routeId = (list.json() as Array<{ id: string }>)[0]!.id;
+    const res = await app.inject({ method: 'GET', url: `/routes/${routeId}` });
+    expect(res.statusCode).toBe(200);
+    const stops = res.json().stops as Array<{ seq: number }>;
+    expect(stops.length).toBeGreaterThan(0);
+    expect(stops[0]!.seq).toBe(1);
+  });
+
+  it('lists upcoming trips', async () => {
+    const res = await app.inject({ method: 'GET', url: '/trips' });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it('boards a trip, spending the fare in tokens', async () => {
+    const token = await authToken(app, 'boarder@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    await app.inject({ method: 'POST', url: '/subscriptions', headers: auth, payload: {} });
+
+    const trips = (await app.inject({ method: 'GET', url: '/trips' })).json() as Array<{
+      id: string;
+      fareTokens: number;
+    }>;
+    const trip = trips[0]!;
+
+    const board = await app.inject({
+      method: 'POST',
+      url: `/trips/${trip.id}/board`,
+      headers: auth,
+    });
+    expect(board.statusCode).toBe(201);
+    expect(board.json().subscription.tokenBalance).toBe(100 - trip.fareTokens);
+    expect(board.json().trip.id).toBe(trip.id);
+
+    const history = await app.inject({ method: 'GET', url: '/boardings/me', headers: auth });
+    expect((history.json() as unknown[]).length).toBe(1);
+  });
+
+  it('rejects double-boarding the same trip', async () => {
+    const token = await authToken(app, 'double@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    await app.inject({ method: 'POST', url: '/subscriptions', headers: auth, payload: {} });
+    const trips = (await app.inject({ method: 'GET', url: '/trips' })).json() as Array<{ id: string }>;
+    const tripId = trips[0]!.id;
+
+    await app.inject({ method: 'POST', url: `/trips/${tripId}/board`, headers: auth });
+    const again = await app.inject({ method: 'POST', url: `/trips/${tripId}/board`, headers: auth });
+    expect(again.statusCode).toBe(409);
+  });
+
+  it('rejects boarding without a subscription', async () => {
+    const token = await authToken(app, 'nosub@trotxi.com');
+    const trips = (await app.inject({ method: 'GET', url: '/trips' })).json() as Array<{ id: string }>;
+    const res = await app.inject({
+      method: 'POST',
+      url: `/trips/${trips[0]!.id}/board`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('returns 404 boarding a non-existent trip', async () => {
+    const token = await authToken(app, 'ghost@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    await app.inject({ method: 'POST', url: '/subscriptions', headers: auth, payload: {} });
+    const res = await app.inject({ method: 'POST', url: '/trips/does-not-exist/board', headers: auth });
     expect(res.statusCode).toBe(404);
   });
 });
