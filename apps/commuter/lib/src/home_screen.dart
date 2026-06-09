@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api_client.dart';
+import 'boarding_pass_screen.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'trips_screen.dart';
@@ -18,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Subscription? _sub;
+  ActiveRide? _activeRide;
   bool _loading = true;
   bool _acting = false;
   String? _error;
@@ -34,7 +36,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _error = null;
     });
     try {
-      _sub = await widget.api.mySubscription();
+      final results = await Future.wait([
+        widget.api.mySubscription(),
+        widget.api.activeRide(),
+      ]);
+      _sub = results[0] as Subscription?;
+      _activeRide = results[1] as ActiveRide?;
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -42,14 +49,43 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _run(Future<Subscription> Function() action) async {
+  Future<void> _subscribe() async {
     setState(() {
       _acting = true;
       _error = null;
     });
     try {
-      final sub = await action();
-      setState(() => _sub = sub);
+      _sub = await widget.api.subscribe();
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      if (mounted) setState(() => _acting = false);
+    }
+  }
+
+  Future<void> _openTrips() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => TripsScreen(api: widget.api, passCode: widget.user.passCode)),
+    );
+    _refresh();
+  }
+
+  Future<void> _openPass() async {
+    final trip = _activeRide?.trip;
+    if (trip == null) return;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BoardingPassScreen(api: widget.api, passCode: widget.user.passCode, trip: trip),
+      ),
+    );
+    _refresh();
+  }
+
+  Future<void> _endRide() async {
+    setState(() => _acting = true);
+    try {
+      await widget.api.completeRide();
+      await _refresh();
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -60,15 +96,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _initial =>
       widget.user.email.isNotEmpty ? widget.user.email[0].toUpperCase() : '?';
 
-  Future<void> _openTrips() async {
-    final boarded = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => TripsScreen(api: widget.api)),
-    );
-    if (boarded == true) _refresh();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final onRide = _activeRide != null;
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _refresh,
@@ -88,12 +118,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
                     )
                   else if (_sub == null)
-                    _NoSubscription(
-                      busy: _acting,
-                      onSubscribe: () => _run(widget.api.subscribe),
-                    )
-                  else
-                    _TokenCard(sub: _sub!, onBoard: _openTrips),
+                    _NoSubscription(busy: _acting, onSubscribe: _subscribe)
+                  else ...[
+                    _TokenCard(
+                      sub: _sub!,
+                      onRide: onRide,
+                      onPrimary: onRide ? _openPass : _openTrips,
+                    ),
+                    if (onRide) ...[
+                      const SizedBox(height: 16),
+                      _ActiveRideCard(
+                        ride: _activeRide!,
+                        busy: _acting,
+                        onViewPass: _openPass,
+                        onEnd: _endRide,
+                      ),
+                    ],
+                  ],
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     Text(_error!, style: const TextStyle(color: AppColors.danger)),
@@ -106,13 +147,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     _ActionTile(
                       icon: Icons.route_outlined,
                       title: 'Browse trips',
-                      subtitle: 'Find and board upcoming rides',
+                      subtitle: onRide ? 'Finish your ride to board another' : 'Find and board upcoming rides',
                       onTap: _openTrips,
                     ),
                     const SizedBox(height: 10),
                     const _ActionTile(icon: Icons.map_outlined, title: 'Live map', subtitle: 'Track your vehicle in real time (coming soon)'),
-                    const SizedBox(height: 10),
-                    const _ActionTile(icon: Icons.receipt_long_outlined, title: 'Trip history', subtitle: 'Your recent boardings (coming soon)'),
                   ],
                 ],
               ),
@@ -172,9 +211,10 @@ class _TopBar extends StatelessWidget {
 }
 
 class _TokenCard extends StatelessWidget {
-  const _TokenCard({required this.sub, required this.onBoard});
+  const _TokenCard({required this.sub, required this.onRide, required this.onPrimary});
   final Subscription sub;
-  final VoidCallback onBoard;
+  final bool onRide;
+  final VoidCallback onPrimary;
 
   @override
   Widget build(BuildContext context) {
@@ -237,11 +277,81 @@ class _TokenCard extends StatelessWidget {
                 backgroundColor: Colors.white,
                 foregroundColor: AppColors.primaryDark,
               ),
-              onPressed: onBoard,
-              child: const Text('Board a trip'),
+              onPressed: onPrimary,
+              child: Text(onRide ? 'View boarding pass' : 'Board a trip'),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ActiveRideCard extends StatelessWidget {
+  const _ActiveRideCard({
+    required this.ride,
+    required this.busy,
+    required this.onViewPass,
+    required this.onEnd,
+  });
+  final ActiveRide ride;
+  final bool busy;
+  final VoidCallback onViewPass;
+  final VoidCallback onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final trip = ride.trip;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.directions_bus_filled, color: AppColors.primary),
+                const SizedBox(width: 8),
+                const Text('On a ride', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                const Spacer(),
+                Container(
+                  width: 9, height: 9,
+                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                ),
+              ],
+            ),
+            if (trip != null) ...[
+              const SizedBox(height: 8),
+              Text(trip.routeName, style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text('${trip.origin}  →  ${trip.destination}',
+                  style: TextStyle(color: AppColors.ink.withValues(alpha: 0.6), fontSize: 13)),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: onViewPass,
+                    child: const Text('View pass'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: busy ? null : onEnd,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      side: const BorderSide(color: AppColors.danger),
+                      minimumSize: const Size.fromHeight(54),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('End ride'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -306,32 +416,32 @@ class _ActionTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: AppColors.primary),
               ),
-              child: Icon(icon, color: AppColors.primary),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: TextStyle(color: AppColors.ink.withValues(alpha: 0.55), fontSize: 13)),
-                ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style: TextStyle(color: AppColors.ink.withValues(alpha: 0.55), fontSize: 13)),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: AppColors.ink.withValues(alpha: 0.3)),
-          ],
-        ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.ink.withValues(alpha: 0.3)),
+            ],
+          ),
         ),
       ),
     );

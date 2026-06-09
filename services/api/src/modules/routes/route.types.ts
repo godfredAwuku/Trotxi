@@ -39,10 +39,13 @@ export interface Trip {
   status: TripStatus;
 }
 
+export type BoardingStatus = 'active' | 'completed';
+
 export interface Boarding {
   id: string;
   userId: string;
   tripId: string;
   tokensSpent: number;
+  status: BoardingStatus;
   createdAt: Date;
 }

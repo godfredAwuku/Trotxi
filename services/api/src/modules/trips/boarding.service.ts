@@ -11,6 +11,11 @@ export interface BoardResult {
   trip: Trip;
 }
 
+export interface ActiveRide {
+  boarding: Boarding;
+  trip: Trip | null;
+}
+
 export class BoardingService {
   constructor(
     private readonly trips: TripRepository,
@@ -19,8 +24,9 @@ export class BoardingService {
   ) {}
 
   /**
-   * Board a trip: validates the trip, ensures the rider hasn't already boarded,
-   * spends the route fare in tokens, then records the boarding.
+   * Board a trip. A rider may hold only one active ride at a time and may
+   * board a given trip only once. Spends the route fare in tokens, then
+   * records an active boarding.
    */
   async board(userId: string, tripId: string): Promise<BoardResult> {
     const trip = await this.trips.findById(tripId);
@@ -29,6 +35,9 @@ export class BoardingService {
     }
     if (trip.status !== 'scheduled' && trip.status !== 'active') {
       throw AppError.badRequest('This trip is no longer boardable', 'TRIP_NOT_BOARDABLE');
+    }
+    if (await this.boardings.findActiveByUser(userId)) {
+      throw AppError.conflict('Finish your current ride before boarding another', 'ON_RIDE');
     }
     if (await this.boardings.exists(userId, tripId)) {
       throw AppError.conflict('You have already boarded this trip', 'ALREADY_BOARDED');
@@ -42,6 +51,23 @@ export class BoardingService {
       tokensSpent: trip.fareTokens,
     });
     return { boarding, subscription, trip };
+  }
+
+  /** The rider's current active ride (with trip details), or null. */
+  async activeRide(userId: string): Promise<ActiveRide | null> {
+    const boarding = await this.boardings.findActiveByUser(userId);
+    if (!boarding) return null;
+    const trip = await this.trips.findById(boarding.tripId);
+    return { boarding, trip };
+  }
+
+  /** End the rider's active ride so they can board again. */
+  async completeRide(userId: string): Promise<Boarding> {
+    const completed = await this.boardings.completeActive(userId);
+    if (!completed) {
+      throw AppError.notFound('No active ride to end', 'NO_ACTIVE_RIDE');
+    }
+    return completed;
   }
 
   async history(userId: string): Promise<Boarding[]> {

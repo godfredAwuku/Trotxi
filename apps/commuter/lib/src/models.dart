@@ -11,16 +11,18 @@ class AuthResult {
 }
 
 class AppUser {
-  AppUser({required this.id, required this.email, required this.role});
+  AppUser({required this.id, required this.email, required this.role, required this.passCode});
 
   final String id;
   final String email;
   final String role;
+  final String passCode;
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
         id: json['id'] as String,
         email: json['email'] as String,
         role: json['role'] as String,
+        passCode: (json['passCode'] as String?) ?? '',
       );
 }
 
@@ -51,6 +53,7 @@ class RouteInfo {
 class Trip {
   Trip({
     required this.id,
+    required this.routeId,
     required this.routeName,
     required this.origin,
     required this.destination,
@@ -61,6 +64,7 @@ class Trip {
   });
 
   final String id;
+  final String routeId;
   final String routeName;
   final String origin;
   final String destination;
@@ -71,6 +75,7 @@ class Trip {
 
   factory Trip.fromJson(Map<String, dynamic> json) => Trip(
         id: json['id'] as String,
+        routeId: json['routeId'] as String,
         routeName: json['routeName'] as String,
         origin: json['origin'] as String,
         destination: json['destination'] as String,
@@ -91,6 +96,69 @@ class BoardResult {
         subscription: Subscription.fromJson(json['subscription'] as Map<String, dynamic>),
         trip: Trip.fromJson(json['trip'] as Map<String, dynamic>),
       );
+}
+
+class Stop {
+  Stop({required this.name, required this.lat, required this.lng, required this.seq});
+
+  final String name;
+  final double lat;
+  final double lng;
+  final int seq;
+
+  factory Stop.fromJson(Map<String, dynamic> json) => Stop(
+        name: json['name'] as String,
+        lat: (json['lat'] as num).toDouble(),
+        lng: (json['lng'] as num).toDouble(),
+        seq: json['seq'] as int,
+      );
+}
+
+class RouteDetail {
+  RouteDetail({
+    required this.id,
+    required this.name,
+    required this.origin,
+    required this.destination,
+    required this.fareTokens,
+    required this.stops,
+  });
+
+  final String id;
+  final String name;
+  final String origin;
+  final String destination;
+  final int fareTokens;
+  final List<Stop> stops;
+
+  factory RouteDetail.fromJson(Map<String, dynamic> json) => RouteDetail(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        origin: json['origin'] as String,
+        destination: json['destination'] as String,
+        fareTokens: json['fareTokens'] as int,
+        stops: (json['stops'] as List<dynamic>)
+            .map((s) => Stop.fromJson(s as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+/// Current active ride from GET /boardings/active. Null when the rider is idle.
+class ActiveRide {
+  ActiveRide({required this.boardingId, required this.trip});
+
+  final String boardingId;
+  final Trip? trip;
+
+  static ActiveRide? fromJson(Map<String, dynamic> json) {
+    if (json['active'] != true) return null;
+    final boarding = json['boarding'] as Map<String, dynamic>;
+    final trip = json['trip'] as Map<String, dynamic>?;
+    return ActiveRide(
+      boardingId: boarding['id'] as String,
+      trip: trip == null ? null : Trip.fromJson(trip),
+    );
+  }
 }
 
 class Subscription {

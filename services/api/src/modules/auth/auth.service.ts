@@ -16,11 +16,11 @@ export interface LoginInput {
 
 export interface AuthResult {
   token: string;
-  user: { id: string; email: string; role: Role };
+  user: { id: string; email: string; role: Role; passCode: string };
 }
 
 function publicUser(user: User): AuthResult['user'] {
-  return { id: user.id, email: user.email, role: user.role };
+  return { id: user.id, email: user.email, role: user.role, passCode: user.passCode };
 }
 
 export class AuthService {

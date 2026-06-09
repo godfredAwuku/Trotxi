@@ -86,6 +86,11 @@ class ApiClient {
     return list.map((j) => Trip.fromJson(j as Map<String, dynamic>)).toList();
   }
 
+  Future<RouteDetail> routeDetail(String routeId) async {
+    final res = await _client.get(_uri('/routes/$routeId'), headers: _headers);
+    return RouteDetail.fromJson(_decode(res) as Map<String, dynamic>);
+  }
+
   Future<BoardResult> boardTrip(String tripId) async {
     final res = await _client.post(
       _uri('/trips/$tripId/board'),
@@ -93,5 +98,19 @@ class ApiClient {
       body: jsonEncode(const <String, dynamic>{}),
     );
     return BoardResult.fromJson(_decode(res) as Map<String, dynamic>);
+  }
+
+  Future<ActiveRide?> activeRide() async {
+    final res = await _client.get(_uri('/boardings/active'), headers: _headers);
+    return ActiveRide.fromJson(_decode(res) as Map<String, dynamic>);
+  }
+
+  Future<void> completeRide() async {
+    final res = await _client.post(
+      _uri('/boardings/active/complete'),
+      headers: _headers,
+      body: jsonEncode(const <String, dynamic>{}),
+    );
+    _decode(res);
   }
 }

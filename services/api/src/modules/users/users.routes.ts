@@ -18,6 +18,7 @@ export async function userRoutes(
       id: user.id,
       email: user.email,
       role: user.role,
+      passCode: user.passCode,
       createdAt: user.createdAt,
     };
   });

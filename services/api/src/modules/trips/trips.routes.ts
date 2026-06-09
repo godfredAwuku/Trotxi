@@ -32,4 +32,15 @@ export async function tripRoutes(
   app.get('/boardings/me', { preHandler: authGuard }, async (request) => {
     return boardings.history(request.auth!.sub);
   });
+
+  // Current active ride (or { active: false }) — drives the home screen state.
+  app.get('/boardings/active', { preHandler: authGuard }, async (request) => {
+    const ride = await boardings.activeRide(request.auth!.sub);
+    return ride ? { active: true, ...ride } : { active: false };
+  });
+
+  // End the current ride so the rider can board another.
+  app.post('/boardings/active/complete', { preHandler: authGuard }, async (request) => {
+    return boardings.completeRide(request.auth!.sub);
+  });
 }

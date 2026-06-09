@@ -36,9 +36,36 @@ describe('BoardingService', () => {
     await expect(service.board(userId, 'nope')).rejects.toThrowError(/Trip not found/);
   });
 
-  it('rejects double boarding', async () => {
+  it('rejects boarding a second ride while one is active', async () => {
+    await subs.subscribe(userId, 'commuter_monthly');
+    const trips = await new InMemoryTripRepository().listUpcoming();
+    await service.board(userId, tripId);
+    const otherTrip = trips.find((t) => t.id !== tripId)!.id;
+    await expect(service.board(userId, otherTrip)).rejects.toThrowError(/current ride/i);
+  });
+
+  it('allows boarding again after ending the active ride', async () => {
+    await subs.subscribe(userId, 'commuter_monthly');
+    const trips = await new InMemoryTripRepository().listUpcoming();
+    await service.board(userId, tripId);
+    await service.completeRide(userId);
+    const otherTrip = trips.find((t) => t.id !== tripId)!.id;
+    const result = await service.board(userId, otherTrip);
+    expect(result.boarding.status).toBe('active');
+  });
+
+  it('exposes the active ride and ends it', async () => {
     await subs.subscribe(userId, 'commuter_monthly');
     await service.board(userId, tripId);
-    await expect(service.board(userId, tripId)).rejects.toThrowError(/already boarded/i);
+    const active = await service.activeRide(userId);
+    expect(active?.boarding.tripId).toBe(tripId);
+    expect(active?.trip?.id).toBe(tripId);
+
+    await service.completeRide(userId);
+    expect(await service.activeRide(userId)).toBeNull();
+  });
+
+  it('rejects ending a ride when none is active', async () => {
+    await expect(service.completeRide(userId)).rejects.toThrowError(/No active ride/);
   });
 });

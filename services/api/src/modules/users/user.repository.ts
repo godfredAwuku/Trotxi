@@ -6,6 +6,7 @@ export interface User {
   email: string;
   passwordHash: string;
   role: Role;
+  passCode: string;
   createdAt: Date;
 }
 
@@ -19,6 +20,7 @@ export interface UserRepository {
   create(user: NewUser): Promise<User>;
   findByEmail(email: string): Promise<User | null>;
   findById(id: string): Promise<User | null>;
+  findByPassCode(passCode: string): Promise<User | null>;
 }
 
 export class InMemoryUserRepository implements UserRepository {
@@ -31,6 +33,7 @@ export class InMemoryUserRepository implements UserRepository {
       email: input.email.toLowerCase(),
       passwordHash: input.passwordHash,
       role: input.role,
+      passCode: randomUUID(),
       createdAt: new Date(),
     };
     this.byId.set(user.id, user);
@@ -44,5 +47,12 @@ export class InMemoryUserRepository implements UserRepository {
 
   async findById(id: string): Promise<User | null> {
     return this.byId.get(id) ?? null;
+  }
+
+  async findByPassCode(passCode: string): Promise<User | null> {
+    for (const user of this.byId.values()) {
+      if (user.passCode === passCode) return user;
+    }
+    return null;
   }
 }

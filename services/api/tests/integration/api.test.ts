@@ -241,3 +241,78 @@ describe('Mobility: routes, trips, boarding', () => {
     expect(res.statusCode).toBe(404);
   });
 });
+
+describe('QR pass + single active ride', () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    app = await makeApp();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('GET /users/me includes a unique pass code', async () => {
+    const token = await authToken(app, 'pass@trotxi.com');
+    const me = await app.inject({
+      method: 'GET',
+      url: '/users/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(typeof me.json().passCode).toBe('string');
+    expect((me.json().passCode as string).length).toBeGreaterThan(10);
+  });
+
+  it('blocks a second active ride, then allows boarding after ending it', async () => {
+    const token = await authToken(app, 'oneride@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    await app.inject({ method: 'POST', url: '/subscriptions', headers: auth, payload: {} });
+    const trips = (await app.inject({ method: 'GET', url: '/trips' })).json() as Array<{ id: string }>;
+
+    const first = await app.inject({ method: 'POST', url: `/trips/${trips[0]!.id}/board`, headers: auth });
+    expect(first.statusCode).toBe(201);
+
+    const blocked = await app.inject({ method: 'POST', url: `/trips/${trips[1]!.id}/board`, headers: auth });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error).toBe('ON_RIDE');
+
+    const active = await app.inject({ method: 'GET', url: '/boardings/active', headers: auth });
+    expect(active.json().active).toBe(true);
+
+    const ended = await app.inject({ method: 'POST', url: '/boardings/active/complete', headers: auth });
+    expect(ended.statusCode).toBe(200);
+    expect(ended.json().status).toBe('completed');
+
+    const again = await app.inject({ method: 'POST', url: `/trips/${trips[1]!.id}/board`, headers: auth });
+    expect(again.statusCode).toBe(201);
+  });
+
+  it('GET /boardings/active returns { active: false } when idle', async () => {
+    const token = await authToken(app, 'idle@trotxi.com');
+    const res = await app.inject({
+      method: 'GET',
+      url: '/boardings/active',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.json().active).toBe(false);
+  });
+
+  it('verifies a pass code and reports the active ride', async () => {
+    const token = await authToken(app, 'scan@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    const passCode = (await app.inject({ method: 'GET', url: '/users/me', headers: auth })).json()
+      .passCode as string;
+    await app.inject({ method: 'POST', url: '/subscriptions', headers: auth, payload: {} });
+    const trips = (await app.inject({ method: 'GET', url: '/trips' })).json() as Array<{ id: string }>;
+    await app.inject({ method: 'POST', url: `/trips/${trips[0]!.id}/board`, headers: auth });
+
+    const verify = await app.inject({ method: 'POST', url: '/pass/verify', payload: { passCode } });
+    expect(verify.statusCode).toBe(200);
+    expect(verify.json().valid).toBe(true);
+    expect(verify.json().hasActiveRide).toBe(true);
+
+    const bad = await app.inject({ method: 'POST', url: '/pass/verify', payload: { passCode: 'nope' } });
+    expect(bad.statusCode).toBe(404);
+  });
+});

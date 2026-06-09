@@ -17,6 +17,7 @@ import type { TripRepository } from './modules/trips/trip.repository';
 import type { BoardingRepository } from './modules/trips/boarding.repository';
 import { BoardingService } from './modules/trips/boarding.service';
 import { tripRoutes } from './modules/trips/trips.routes';
+import { passRoutes } from './modules/pass/pass.routes';
 import type { UserRepository } from './modules/users/user.repository';
 import { userRoutes } from './modules/users/users.routes';
 
@@ -96,6 +97,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(subscriptionRoutes, { service: subscriptionService, authGuard: guard });
   await app.register(routeRoutes, { repo: deps.routes });
   await app.register(tripRoutes, { trips: deps.trips, boardings: boardingService, authGuard: guard });
+  await app.register(passRoutes, { users: deps.users, boardings: boardingService });
 
   return app;
 }
