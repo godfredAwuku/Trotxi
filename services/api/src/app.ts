@@ -2,7 +2,7 @@ import fastifyCors from '@fastify/cors';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { authGuard as makeAuthGuard } from './lib/auth.guard';
+import { authGuard as makeAuthGuard, requireRole } from './lib/auth.guard';
 import { AppError } from './lib/errors';
 import type { JwtConfig } from './lib/jwt';
 import { authRoutes } from './modules/auth/auth.routes';
@@ -110,6 +110,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     boardings: boardingService,
     live: liveService,
     authGuard: guard,
+    driverGuard: requireRole('driver'),
   });
   await app.register(passRoutes, { users: deps.users, boardings: boardingService });
   await app.register(paymentRoutes, { service: paymentService, authGuard: guard });

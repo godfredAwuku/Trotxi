@@ -182,6 +182,43 @@ describe('Mobility: routes, trips, boarding', () => {
     expect(res.json()).toHaveProperty('lat');
     expect(res.json()).toHaveProperty('lng');
     expect(res.json()).toHaveProperty('nextStop');
+    expect(res.json().source).toBe('simulated');
+  });
+
+  it('driver-published position is used and served as live', async () => {
+    // Register a driver
+    const reg = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload: { email: 'driver@trotxi.com', password: 'password123', role: 'driver' },
+    });
+    const driverToken = reg.json().token as string;
+    const trips = (await app.inject({ method: 'GET', url: '/trips' })).json() as Array<{ id: string }>;
+    const tripId = trips[0]!.id;
+
+    const pub = await app.inject({
+      method: 'POST',
+      url: `/trips/${tripId}/position`,
+      headers: { authorization: `Bearer ${driverToken}` },
+      payload: { lat: 5.61, lng: -0.2, bearing: 120 },
+    });
+    expect(pub.statusCode).toBe(200);
+
+    const pos = await app.inject({ method: 'GET', url: `/trips/${tripId}/position` });
+    expect(pos.json().source).toBe('live');
+    expect(pos.json().lat).toBeCloseTo(5.61);
+  });
+
+  it('rejects a commuter publishing a position (403)', async () => {
+    const token = await authToken(app, 'notadriver@trotxi.com'); // default role: commuter
+    const trips = (await app.inject({ method: 'GET', url: '/trips' })).json() as Array<{ id: string }>;
+    const res = await app.inject({
+      method: 'POST',
+      url: `/trips/${trips[0]!.id}/position`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { lat: 5.6, lng: -0.2 },
+    });
+    expect(res.statusCode).toBe(403);
   });
 
   it('boards a trip, spending the fare in tokens', async () => {

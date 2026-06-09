@@ -30,4 +30,13 @@ describe('LivePositionService', () => {
   it('returns null for an unknown trip', async () => {
     expect(await service.positionFor('nope')).toBeNull();
   });
+
+  it('prefers a fresh driver-reported fix over the simulation', async () => {
+    const tripId = (await trips.listUpcoming())[0]!.id;
+    service.report(tripId, { lat: 5.6, lng: -0.2, bearing: 90 });
+    const pos = await service.positionFor(tripId);
+    expect(pos!.source).toBe('live');
+    expect(pos!.lat).toBeCloseTo(5.6);
+    expect(pos!.lng).toBeCloseTo(-0.2);
+  });
 });

@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from './errors';
-import { verifyToken, type AuthClaims } from './jwt';
+import { verifyToken, type AuthClaims, type Role } from './jwt';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -20,6 +20,16 @@ export function authGuard(config: { secret: string; expiresIn: string }) {
       request.auth = verifyToken(token, config);
     } catch {
       throw AppError.unauthorized('Invalid or expired token');
+    }
+  };
+}
+
+// preHandler that requires the authenticated user to hold one of the given roles.
+// Use after authGuard, e.g. preHandler: [guard, requireRole('driver')].
+export function requireRole(...roles: Role[]) {
+  return async function (request: FastifyRequest, _reply: FastifyReply): Promise<void> {
+    if (!request.auth || !roles.includes(request.auth.role)) {
+      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to do that');
     }
   };
 }
