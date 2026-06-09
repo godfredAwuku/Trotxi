@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'api_client.dart';
@@ -102,8 +103,21 @@ class _BoardingPassScreenState extends State<BoardingPassScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text('Pass ${widget.passCode.substring(0, 8).toUpperCase()}',
-                      style: TextStyle(color: AppColors.ink.withValues(alpha: 0.5), fontSize: 12)),
+                  SelectableText(
+                    widget.passCode,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.ink.withValues(alpha: 0.5), fontSize: 12),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: widget.passCode));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Pass code copied')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy, size: 16),
+                    label: const Text('Copy code'),
+                  ),
                 ],
               ),
             ),
