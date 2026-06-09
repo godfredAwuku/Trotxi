@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api_client.dart';
 import 'models.dart';
+import 'theme.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api, required this.user, required this.onSignOut});
@@ -17,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   Subscription? _sub;
   bool _loading = true;
+  bool _acting = false;
   String? _error;
 
   @override
@@ -40,63 +42,245 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _run(Future<Subscription> Function() action) async {
-    setState(() => _error = null);
+    setState(() {
+      _acting = true;
+      _error = null;
+    });
     try {
       final sub = await action();
       setState(() => _sub = sub);
     } catch (e) {
       setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _acting = false);
     }
   }
+
+  String get _initial =>
+      widget.user.email.isNotEmpty ? widget.user.email[0].toUpperCase() : '?';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Trotxi'),
-        actions: [IconButton(onPressed: widget.onSignOut, icon: const Icon(Icons.logout))],
-      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
+        color: AppColors.primary,
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.zero,
           children: [
-            Text('Hi, ${widget.user.email}', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 24),
-            if (_loading)
-              const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
-            else if (_sub == null)
-              _NoSubscription(onSubscribe: () => _run(widget.api.subscribe))
-            else
-              _SubscriptionCard(sub: _sub!, onRedeem: () => _run(() => widget.api.redeem())),
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-            ],
+            _TopBar(initial: _initial, email: widget.user.email, onSignOut: widget.onSignOut),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_loading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 80),
+                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                    )
+                  else if (_sub == null)
+                    _NoSubscription(
+                      busy: _acting,
+                      onSubscribe: () => _run(widget.api.subscribe),
+                    )
+                  else
+                    _TokenCard(
+                      sub: _sub!,
+                      busy: _acting,
+                      onRedeem: () => _run(() => widget.api.redeem()),
+                    ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    Text(_error!, style: const TextStyle(color: AppColors.danger)),
+                  ],
+                  if (_sub != null) ...[
+                    const SizedBox(height: 28),
+                    const Text('Quick actions',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 12),
+                    const _ActionTile(icon: Icons.map_outlined, title: 'Live map', subtitle: 'Track your vehicle in real time'),
+                    const SizedBox(height: 10),
+                    const _ActionTile(icon: Icons.route_outlined, title: 'My routes', subtitle: 'Saved commutes and schedules'),
+                    const SizedBox(height: 10),
+                    const _ActionTile(icon: Icons.receipt_long_outlined, title: 'Trip history', subtitle: 'Tokens redeemed this month'),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.initial, required this.email, required this.onSignOut});
+  final String initial;
+  final String email;
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 20, 12, 20),
+      decoration: const BoxDecoration(
+        gradient: AppColors.brandGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.white.withValues(alpha: 0.22),
+            child: Text(initial,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Welcome back',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                Text(email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onSignOut,
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
+            tooltip: 'Sign out',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TokenCard extends StatelessWidget {
+  const _TokenCard({required this.sub, required this.busy, required this.onRedeem});
+  final Subscription sub;
+  final bool busy;
+  final VoidCallback onRedeem;
+
+  @override
+  Widget build(BuildContext context) {
+    final expiry = '${sub.expiresAt.year}-${sub.expiresAt.month.toString().padLeft(2, '0')}-${sub.expiresAt.day.toString().padLeft(2, '0')}';
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: AppColors.brandGradient,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Commuter Monthly',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(sub.status.toUpperCase(),
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('${sub.tokenBalance}',
+                  style: const TextStyle(color: Colors.white, fontSize: 60, fontWeight: FontWeight.w800, height: 1)),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text('/ 100 tokens',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 16)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('Renews $expiry',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13)),
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primaryDark,
+              ),
+              onPressed: busy ? null : onRedeem,
+              child: busy
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.primary))
+                  : const Text('Board a trip  ·  −1 token'),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _NoSubscription extends StatelessWidget {
-  const _NoSubscription({required this.onSubscribe});
+  const _NoSubscription({required this.busy, required this.onSubscribe});
+  final bool busy;
   final VoidCallback onSubscribe;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(28),
         child: Column(
           children: [
-            const Text('No active subscription'),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.confirmation_number_outlined, color: AppColors.primary, size: 36),
+            ),
+            const SizedBox(height: 18),
+            const Text('No active plan',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            const Text('Subscribe to get 100 commute tokens for the month.',
-                textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onSubscribe, child: const Text('Subscribe — commuter monthly')),
+            Text(
+              'Subscribe to Commuter Monthly and get 100 tokens for reliable daily rides.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.ink.withValues(alpha: 0.6), height: 1.4),
+            ),
+            const SizedBox(height: 22),
+            FilledButton(
+              onPressed: busy ? null : onSubscribe,
+              child: busy
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                  : const Text('Subscribe  ·  100 tokens'),
+            ),
           ],
         ),
       ),
@@ -104,36 +288,40 @@ class _NoSubscription extends StatelessWidget {
   }
 }
 
-class _SubscriptionCard extends StatelessWidget {
-  const _SubscriptionCard({required this.sub, required this.onRedeem});
-  final Subscription sub;
-  final VoidCallback onRedeem;
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({required this.icon, required this.title, required this.subtitle});
+  final IconData icon;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(14),
+        child: Row(
           children: [
-            Text(sub.plan, style: Theme.of(context).textTheme.titleLarge),
-            Text('Status: ${sub.status}'),
-            const SizedBox(height: 16),
-            Center(
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: AppColors.primary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${sub.tokenBalance}',
-                      style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold)),
-                  const Text('tokens remaining'),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: TextStyle(color: AppColors.ink.withValues(alpha: 0.55), fontSize: 13)),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(onPressed: onRedeem, child: const Text('Redeem a trip (-1 token)')),
-            ),
+            Icon(Icons.chevron_right_rounded, color: AppColors.ink.withValues(alpha: 0.3)),
           ],
         ),
       ),

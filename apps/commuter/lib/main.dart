@@ -4,6 +4,7 @@ import 'src/api_client.dart';
 import 'src/auth_screen.dart';
 import 'src/home_screen.dart';
 import 'src/models.dart';
+import 'src/theme.dart';
 
 void main() {
   runApp(const TrotxiApp());
@@ -34,13 +35,19 @@ class _TrotxiAppState extends State<TrotxiApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Trotxi',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B998B)),
-        useMaterial3: true,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
+      home: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        child: _user == null
+            ? AuthScreen(key: const ValueKey('auth'), api: _api, onAuthed: _onAuthed)
+            : HomeScreen(
+                key: const ValueKey('home'),
+                api: _api,
+                user: _user!,
+                onSignOut: _signOut,
+              ),
       ),
-      home: _user == null
-          ? AuthScreen(api: _api, onAuthed: _onAuthed)
-          : HomeScreen(api: _api, user: _user!, onSignOut: _signOut),
     );
   }
 }
