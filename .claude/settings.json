@@ -8,5 +8,8 @@
       "WebFetch",
       "WebSearch"
     ]
+  },
+  "enabledPlugins": {
+    "understand-anything@understand-anything": true
   }
 }
