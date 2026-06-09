@@ -34,84 +34,100 @@ They meet at Redis (dispatch reads live positions) and Kafka (event backbone, po
 
 ## Repo Structure
 
+Legend: ✅ exists today · 🔭 planned (not built yet).
+
 ```
 trotxi/
 ├── services/
-│   ├── api/          # Node.js + TypeScript — auth, users, subscriptions, tokens
-│   │   ├── src/
-│   │   │   ├── app.ts              # Fastify app builder (DI entry point)
-│   │   │   ├── server.ts           # Entrypoint — wires repos, starts listening
-│   │   │   ├── config/env.ts       # Zod-validated environment config
-│   │   │   ├── lib/                # errors, password (scrypt), jwt, validate, auth.guard
-│   │   │   ├── db/migrations/      # SQL migrations (001_init.sql)
-│   │   │   └── modules/
-│   │   │       ├── health/         # /healthz, /readyz
-│   │   │       ├── auth/           # register, login (AuthService)
-│   │   │       ├── users/          # /users/me, UserRepository (memory + pg)
-│   │   │       └── subscriptions/  # subscribe, redeem tokens (SubscriptionService)
-│   │   └── tests/                  # Unit + integration tests (vitest)
-│   └── geo/          # Go — MQTT GPS ingestion service
-│       ├── cmd/geo/main.go
-│       └── internal/
-│           ├── config/             # Env-based MQTT config
-│           └── ingest/             # Fix parsing, MQTT consumer, tests
-├── infra/docker/     # docker-compose: Postgres+PostGIS, Redis, EMQX
+│   └── api/          # ✅ Node.js + TypeScript — auth, users, subscriptions, mobility
+│       ├── src/
+│       │   ├── app.ts              # Fastify app builder (DI entry point)
+│       │   ├── server.ts           # Entrypoint — picks repos by env, starts listening
+│       │   ├── config/
+│       │   │   ├── env.ts          # Zod-validated app environment config
+│       │   │   └── dotenv.ts       # .env loader + requireDatabaseUrl (for DB scripts)
+│       │   ├── lib/                # errors, password (scrypt), jwt, validate, auth.guard
+│       │   ├── db/
+│       │   │   ├── migrations/     # 001_init.sql (users, subscriptions),
+│       │   │   │                   # 002_mobility.sql (vehicles, routes, stops, trips, boardings)
+│       │   │   ├── migrate.ts      # idempotent migration runner (_migrations table)
+│       │   │   ├── seed.ts         # seeds demo Accra routes/trips/vehicles into Postgres
+│       │   │   └── seed-data.ts    # shared demo data (in-memory repos + SQL seed)
+│       │   └── modules/
+│       │       ├── health/         # /healthz, /readyz (readyz checks DB when wired)
+│       │       ├── auth/           # register, login (AuthService)
+│       │       ├── users/          # /users/me, UserRepository (memory + pg)
+│       │       ├── subscriptions/  # subscribe, redeem tokens (memory + pg)
+│       │       ├── routes/         # /routes, /routes/:id + stops (memory + pg)
+│       │       └── trips/          # /trips, /trips/:id, board, boardings (BoardingService)
+│       └── tests/                  # Unit + integration tests (vitest), fastify.inject()
+├── apps/
+│   └── commuter/     # ✅ Flutter app — auth, subscribe, token balance, browse + board trips
+│       └── lib/src/  # config (platform-aware API URL), api_client, models, theme, screens
+├── infra/docker/     # ✅ docker-compose: Postgres+PostGIS (5432), Redis (6379), EMQX (1883/18083)
 ├── .github/workflows/
-│   ├── ci.yml        # Path-filtered lint/typecheck/test/build per service
-│   └── deploy.yml    # Build images → staging (smoke test) → production (manual approval)
-├── Makefile          # `make help` lists all tasks
-└── .husky/           # pre-commit (lint-staged) + commit-msg (commitlint)
+│   └── ci.yml        # ✅ Node 22 — typecheck, lint, test:coverage, build for services/api
+├── Makefile          # ✅ `make help` lists all tasks (up/down, dev, test, migrate, seed…)
+├── README.md         # ✅ quick start (in-memory + Postgres), endpoint table
+│
+│   # 🔭 Planned, not yet created:
+├── services/geo/     # 🔭 Go — MQTT GPS ingestion → Redis → WebSocket
+├── services/dashboard/  # 🔭 Next.js ops dashboard
+└── apps/driver/      # 🔭 Flutter driver app (background GPS → MQTT)
 ```
 
 ## Current State (what works today)
 
 ### API service (services/api)
-- **19 tests passing** (unit + integration via fastify.inject)
-- ~95% line coverage
-- Typecheck clean (strict mode), lint clean (ESLint flat config)
+- **34 tests passing** (unit + integration via fastify.inject)
+- Typecheck clean (strict mode), lint clean (ESLint flat config), coverage gate 70% lines
 - Builds via tsup → dist/server.js
-- Runs with in-memory repositories (zero infra needed)
-- Swagger UI at /docs when running
-- Endpoints: /healthz, /readyz, POST /auth/register, POST /auth/login, GET /users/me (JWT), POST /subscriptions (JWT), GET /subscriptions/me (JWT), POST /subscriptions/redeem (JWT)
-- Token model: 100 tokens per commuter_monthly subscription, redeem per trip, insufficient-balance and no-subscription guards implemented
+- Runs with **in-memory repositories by default** (zero infra) OR **Postgres** when `DATABASE_URL` is set — repo choice happens in server.ts
+- Swagger UI at /docs; `GET /` returns service info
+- **Auth/account**: POST /auth/register, POST /auth/login, GET /users/me (JWT)
+- **Subscriptions/tokens**: POST /subscriptions, GET /subscriptions/me, POST /subscriptions/redeem (JWT). 100 tokens per commuter_monthly plan; insufficient-balance and no-subscription guards
+- **Mobility**: GET /routes, GET /routes/:id (with ordered stops), GET /trips (`?routeId`), GET /trips/:id, POST /trips/:id/board (JWT — spends the route fare in tokens, records a boarding), GET /boardings/me (JWT). Guards: unknown/non-boardable trip, double-boarding, plus the subscription guards
+- **Postgres path verified end-to-end**: `make up` → `make migrate` → `make seed` → register → subscribe → board (token decrement persists). Demo data = 3 Accra routes, 11 stops, 2 vehicles, 4 trips
+- CORS enabled (Flutter web), graceful shutdown, `.env` auto-loaded in dev
 
-### Geo service (services/geo)
-- ParseFix tests passing (valid, empty, out-of-range)
-- MQTT consumer skeleton (EMQX, QoS 1, auto-reconnect)
-- Not yet wired to Redis or TimescaleDB
+### Commuter app (apps/commuter)
+- Flutter app, branded UI (theme.dart), `flutter analyze` clean + widget test passing
+- Flows wired to the live API: register/sign in → subscribe → token balance → **browse upcoming trips → board** (balance refreshes on return)
+- Platform-aware API base URL (localhost for macOS/iOS/web/desktop, 10.0.2.2 for Android emulator; override via `--dart-define=API_BASE_URL=...`)
+- macOS network-client entitlement set; runs on macOS desktop and Chrome web
 
 ### Infrastructure
-- Docker Compose: Postgres+PostGIS (5432), Redis (6379), EMQX (1883/18083) — all healthy
-- CI/CD: GitHub Actions with path-filtered jobs, OIDC-based deploy pipeline
-- Quality gates: conventional commits, CODEOWNERS, PR template, coverage thresholds
+- Docker Compose: Postgres+PostGIS (5432), Redis (6379), EMQX (1883/18083). Postgres exercised by the API; Redis + EMQX are running but **not yet consumed** (await the geo/telemetry path)
+- CI: single GitHub Actions job (Node 22) — typecheck, lint, test:coverage, build for services/api
+- `.claude/settings.json` holds a dev-command permission allowlist
+- Note: conventional-commits/CODEOWNERS/PR-template/husky and the staged deploy pipeline are conventions we follow but are **not yet configured** in the repo
 
 ## What to Build Next (priority order)
 
-### 1. Wire API to Postgres
-- Set DATABASE_URL in .env, create a pg Pool in server.ts
-- Run 001_init.sql migration against the local Postgres
-- Swap InMemoryUserRepository → PgUserRepository (already written)
-- Write PgSubscriptionRepository (follow the pattern in user.repository.pg.ts)
-- Add integration tests that hit real Postgres (use a test database)
-- Ensure existing in-memory tests still pass (repo choice based on env)
+> ✅ **Done already:** API wired to Postgres (Pg repos for users/subscriptions/routes/trips/boardings, migration runner, seed); mobility domain (routes/stops/vehicles/trips/boardings) with token-spending boarding flow; commuter app browse + board.
 
-### 2. Wire Geo → Redis → WebSocket
-- In the Go geo service: after ParseFix, write live position to Redis (SET with geo commands)
-- Publish to a Redis channel (e.g., trip:{tripId}) on each GPS update
-- Build a Go WebSocket server that subscribes to Redis channels and pushes to connected clients
-- Test with a mock MQTT publish (mosquitto_pub or a test script)
+### 1. Mobile-money payments (highest value — this is the revenue mechanism)
+- Integrate MTN MoMo first, via Paystack or Hubtel (Node SDK)
+- Subscription = a real recurring MoMo charge; verify webhook + reconcile to the subscriptions table
+- Handle pending/failed/retry states; never grant tokens before payment confirms
+- Phone-number-first onboarding (Ghana is phone-first, not email-first as built today) — add SMS OTP
+
+### 2. Driver app + telemetry path (services/geo — does not exist yet)
+- Flutter driver app: auth, today's route, check-ins, **background GPS → MQTT publish (EMQX, QoS 1)**
+- Go geo-processor: consume MQTT → parse fix → write live position to Redis (GEO commands) → publish to a Redis channel (e.g. trip:{tripId})
+- Go WebSocket server: subscribe to Redis channels → push to connected commuter apps
+- Commuter app: live vehicle map consuming the WebSocket; arrival alerts
+- Test with a mock MQTT publisher (mosquitto_pub or a script)
 
 ### 3. Operations Dashboard (services/dashboard)
-- Next.js app in services/dashboard
-- Auth: login via the API, store JWT
-- Pages: live fleet map (consume WebSocket positions), trip list, subscription overview, driver list
-- Wire to the API endpoints that exist today
-- Add to CI workflow
+- Next.js app: login via the API, live fleet map (WebSocket positions), trip list, subscription/driver overview
+- Add to CI
 
-### 4. Flutter Mobile Apps
-- Commuter app: subscribe, live vehicle map, arrival alerts, offline caching
-- Driver app: route display, check-ins, background GPS → MQTT publish, incident reporting
-- Both need: auth flow, token display, push notifications
+### 4. Production hardening
+- Auth: refresh tokens, password reset, rate limiting, RBAC enforced per role
+- Observability: Sentry, structured logs, metrics/traces, alerting
+- Infra: AWS (RDS, ElastiCache, ECS/EKS), staged CI/CD with manual prod approval, secrets management, TLS
+- Compliance: Ghana Data Protection Act (Act 843), BoG payment regs, DVLA driver/vehicle KYC
 
 ### 5. Post-MVP
 - Kafka event backbone
