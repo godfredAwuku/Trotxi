@@ -1,3 +1,4 @@
+import fastifyCors from '@fastify/cors';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -23,6 +24,9 @@ export interface AppDeps {
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: deps.logger ?? false });
+
+  // Allow browser clients (Flutter web) to call the API cross-origin.
+  await app.register(fastifyCors, { origin: true });
 
   await app.register(fastifySwagger, {
     openapi: {
