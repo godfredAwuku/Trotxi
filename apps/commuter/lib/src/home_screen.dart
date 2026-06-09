@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api_client.dart';
 import 'models.dart';
 import 'theme.dart';
+import 'trips_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.api, required this.user, required this.onSignOut});
@@ -59,6 +60,13 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _initial =>
       widget.user.email.isNotEmpty ? widget.user.email[0].toUpperCase() : '?';
 
+  Future<void> _openTrips() async {
+    final boarded = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => TripsScreen(api: widget.api)),
+    );
+    if (boarded == true) _refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,11 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onSubscribe: () => _run(widget.api.subscribe),
                     )
                   else
-                    _TokenCard(
-                      sub: _sub!,
-                      busy: _acting,
-                      onRedeem: () => _run(() => widget.api.redeem()),
-                    ),
+                    _TokenCard(sub: _sub!, onBoard: _openTrips),
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     Text(_error!, style: const TextStyle(color: AppColors.danger)),
@@ -99,11 +103,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Text('Quick actions',
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 12),
-                    const _ActionTile(icon: Icons.map_outlined, title: 'Live map', subtitle: 'Track your vehicle in real time'),
+                    _ActionTile(
+                      icon: Icons.route_outlined,
+                      title: 'Browse trips',
+                      subtitle: 'Find and board upcoming rides',
+                      onTap: _openTrips,
+                    ),
                     const SizedBox(height: 10),
-                    const _ActionTile(icon: Icons.route_outlined, title: 'My routes', subtitle: 'Saved commutes and schedules'),
+                    const _ActionTile(icon: Icons.map_outlined, title: 'Live map', subtitle: 'Track your vehicle in real time (coming soon)'),
                     const SizedBox(height: 10),
-                    const _ActionTile(icon: Icons.receipt_long_outlined, title: 'Trip history', subtitle: 'Tokens redeemed this month'),
+                    const _ActionTile(icon: Icons.receipt_long_outlined, title: 'Trip history', subtitle: 'Your recent boardings (coming soon)'),
                   ],
                 ],
               ),
@@ -163,10 +172,9 @@ class _TopBar extends StatelessWidget {
 }
 
 class _TokenCard extends StatelessWidget {
-  const _TokenCard({required this.sub, required this.busy, required this.onRedeem});
+  const _TokenCard({required this.sub, required this.onBoard});
   final Subscription sub;
-  final bool busy;
-  final VoidCallback onRedeem;
+  final VoidCallback onBoard;
 
   @override
   Widget build(BuildContext context) {
@@ -229,12 +237,8 @@ class _TokenCard extends StatelessWidget {
                 backgroundColor: Colors.white,
                 foregroundColor: AppColors.primaryDark,
               ),
-              onPressed: busy ? null : onRedeem,
-              child: busy
-                  ? const SizedBox(
-                      height: 20, width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.primary))
-                  : const Text('Board a trip  ·  −1 token'),
+              onPressed: onBoard,
+              child: const Text('Board a trip'),
             ),
           ),
         ],
@@ -289,15 +293,19 @@ class _NoSubscription extends StatelessWidget {
 }
 
 class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.icon, required this.title, required this.subtitle});
+  const _ActionTile({required this.icon, required this.title, required this.subtitle, this.onTap});
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
@@ -323,6 +331,7 @@ class _ActionTile extends StatelessWidget {
             ),
             Icon(Icons.chevron_right_rounded, color: AppColors.ink.withValues(alpha: 0.3)),
           ],
+        ),
         ),
       ),
     );

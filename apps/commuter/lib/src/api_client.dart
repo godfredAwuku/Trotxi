@@ -79,4 +79,15 @@ class ApiClient {
     );
     return Subscription.fromJson(_decode(res) as Map<String, dynamic>);
   }
+
+  Future<List<Trip>> upcomingTrips() async {
+    final res = await _client.get(_uri('/trips'), headers: _headers);
+    final list = _decode(res) as List<dynamic>;
+    return list.map((j) => Trip.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  Future<BoardResult> boardTrip(String tripId) async {
+    final res = await _client.post(_uri('/trips/$tripId/board'), headers: _headers);
+    return BoardResult.fromJson(_decode(res) as Map<String, dynamic>);
+  }
 }

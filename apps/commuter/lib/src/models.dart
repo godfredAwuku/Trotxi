@@ -24,6 +24,75 @@ class AppUser {
       );
 }
 
+class RouteInfo {
+  RouteInfo({
+    required this.id,
+    required this.name,
+    required this.origin,
+    required this.destination,
+    required this.fareTokens,
+  });
+
+  final String id;
+  final String name;
+  final String origin;
+  final String destination;
+  final int fareTokens;
+
+  factory RouteInfo.fromJson(Map<String, dynamic> json) => RouteInfo(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        origin: json['origin'] as String,
+        destination: json['destination'] as String,
+        fareTokens: json['fareTokens'] as int,
+      );
+}
+
+class Trip {
+  Trip({
+    required this.id,
+    required this.routeName,
+    required this.origin,
+    required this.destination,
+    required this.fareTokens,
+    required this.vehicleLabel,
+    required this.scheduledAt,
+    required this.status,
+  });
+
+  final String id;
+  final String routeName;
+  final String origin;
+  final String destination;
+  final int fareTokens;
+  final String? vehicleLabel;
+  final DateTime scheduledAt;
+  final String status;
+
+  factory Trip.fromJson(Map<String, dynamic> json) => Trip(
+        id: json['id'] as String,
+        routeName: json['routeName'] as String,
+        origin: json['origin'] as String,
+        destination: json['destination'] as String,
+        fareTokens: json['fareTokens'] as int,
+        vehicleLabel: json['vehicleLabel'] as String?,
+        scheduledAt: DateTime.parse(json['scheduledAt'] as String).toLocal(),
+        status: json['status'] as String,
+      );
+}
+
+class BoardResult {
+  BoardResult({required this.subscription, required this.trip});
+
+  final Subscription subscription;
+  final Trip trip;
+
+  factory BoardResult.fromJson(Map<String, dynamic> json) => BoardResult(
+        subscription: Subscription.fromJson(json['subscription'] as Map<String, dynamic>),
+        trip: Trip.fromJson(json['trip'] as Map<String, dynamic>),
+      );
+}
+
 class Subscription {
   Subscription({
     required this.id,
