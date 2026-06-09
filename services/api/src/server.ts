@@ -1,6 +1,13 @@
+import { existsSync } from 'node:fs';
 import { Pool } from 'pg';
 import { buildApp } from './app';
 import { loadEnv } from './config/env';
+
+// Load a local .env if present (Node 20.12+ / 22 built-in). Production injects
+// env vars directly, so a missing .env is fine.
+if (existsSync('.env')) {
+  process.loadEnvFile('.env');
+}
 import { InMemorySubscriptionRepository } from './modules/subscriptions/subscription.repository';
 import { InMemoryUserRepository } from './modules/users/user.repository';
 import { PgUserRepository } from './modules/users/user.repository.pg';
