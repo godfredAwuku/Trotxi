@@ -23,6 +23,13 @@ describe('API integration', () => {
     await app.close();
   });
 
+  it('GET / returns service info', async () => {
+    const res = await app.inject({ method: 'GET', url: '/' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().service).toBe('trotxi-api');
+    expect(res.json().docs).toBe('/docs');
+  });
+
   it('GET /healthz returns ok', async () => {
     const res = await app.inject({ method: 'GET', url: '/healthz' });
     expect(res.statusCode).toBe(200);

@@ -49,6 +49,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const authService = new AuthService(deps.users, deps.jwt);
   const subscriptionService = new SubscriptionService(deps.subscriptions);
 
+  app.get('/', async () => ({
+    service: 'trotxi-api',
+    version: '0.1.0',
+    docs: '/docs',
+    health: '/healthz',
+  }));
+
   await app.register(healthRoutes, { isReady: deps.isReady ?? (async () => true) });
   await app.register(authRoutes, { service: authService });
   await app.register(userRoutes, { users: deps.users, authGuard: guard });
