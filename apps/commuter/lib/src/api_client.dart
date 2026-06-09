@@ -65,6 +65,19 @@ class ApiClient {
     return Subscription.fromJson(_decode(res) as Map<String, dynamic>);
   }
 
+  Future<CheckoutResult> checkout({
+    required String phone,
+    required String network,
+    String plan = 'commuter_monthly',
+  }) async {
+    final res = await _client.post(
+      _uri('/payments/checkout'),
+      headers: _headers,
+      body: jsonEncode({'plan': plan, 'phone': phone, 'network': network}),
+    );
+    return CheckoutResult.fromJson(_decode(res) as Map<String, dynamic>);
+  }
+
   Future<Subscription?> mySubscription() async {
     final res = await _client.get(_uri('/subscriptions/me'), headers: _headers);
     if (res.statusCode == 404) return null;

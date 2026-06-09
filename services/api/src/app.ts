@@ -18,6 +18,10 @@ import type { BoardingRepository } from './modules/trips/boarding.repository';
 import { BoardingService } from './modules/trips/boarding.service';
 import { tripRoutes } from './modules/trips/trips.routes';
 import { passRoutes } from './modules/pass/pass.routes';
+import type { PaymentRepository } from './modules/payments/payment.repository';
+import type { PaymentProvider } from './modules/payments/payment.provider';
+import { PaymentService } from './modules/payments/payment.service';
+import { paymentRoutes } from './modules/payments/payments.routes';
 import type { UserRepository } from './modules/users/user.repository';
 import { userRoutes } from './modules/users/users.routes';
 
@@ -27,6 +31,8 @@ export interface AppDeps {
   routes: RouteRepository;
   trips: TripRepository;
   boardings: BoardingRepository;
+  payments: PaymentRepository;
+  paymentProvider: PaymentProvider;
   jwt: JwtConfig;
   isReady?: () => Promise<boolean>;
   logger?: boolean;
@@ -83,6 +89,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const authService = new AuthService(deps.users, deps.jwt);
   const subscriptionService = new SubscriptionService(deps.subscriptions);
   const boardingService = new BoardingService(deps.trips, deps.boardings, subscriptionService);
+  const paymentService = new PaymentService(deps.payments, deps.paymentProvider, subscriptionService);
 
   app.get('/', async () => ({
     service: 'trotxi-api',
@@ -98,6 +105,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(routeRoutes, { repo: deps.routes });
   await app.register(tripRoutes, { trips: deps.trips, boardings: boardingService, authGuard: guard });
   await app.register(passRoutes, { users: deps.users, boardings: boardingService });
+  await app.register(paymentRoutes, { service: paymentService, authGuard: guard });
 
   return app;
 }

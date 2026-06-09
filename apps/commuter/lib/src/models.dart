@@ -98,6 +98,20 @@ class BoardResult {
       );
 }
 
+class CheckoutResult {
+  CheckoutResult({required this.paymentStatus, required this.subscription});
+
+  final String paymentStatus; // paid | pending
+  final Subscription? subscription;
+
+  factory CheckoutResult.fromJson(Map<String, dynamic> json) => CheckoutResult(
+        paymentStatus: (json['payment'] as Map<String, dynamic>)['status'] as String,
+        subscription: json['subscription'] == null
+            ? null
+            : Subscription.fromJson(json['subscription'] as Map<String, dynamic>),
+      );
+}
+
 class Stop {
   Stop({required this.name, required this.lat, required this.lng, required this.seq});
 

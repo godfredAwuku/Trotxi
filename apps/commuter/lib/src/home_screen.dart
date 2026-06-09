@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api_client.dart';
 import 'boarding_pass_screen.dart';
+import 'checkout_screen.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'trip_history_screen.dart';
@@ -51,17 +52,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _subscribe() async {
-    setState(() {
-      _acting = true;
-      _error = null;
-    });
-    try {
-      _sub = await widget.api.subscribe();
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      if (mounted) setState(() => _acting = false);
-    }
+    final paid = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => CheckoutScreen(api: widget.api)),
+    );
+    if (paid == true) _refresh();
   }
 
   Future<void> _openTrips() async {
@@ -403,7 +397,7 @@ class _NoSubscription extends StatelessWidget {
                   ? const SizedBox(
                       height: 20, width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
-                  : const Text('Subscribe  ·  100 tokens'),
+                  : const Text('Subscribe with mobile money'),
             ),
           ],
         ),

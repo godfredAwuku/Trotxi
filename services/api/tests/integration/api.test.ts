@@ -6,6 +6,8 @@ import { InMemoryUserRepository } from '../../src/modules/users/user.repository'
 import { InMemoryRouteRepository } from '../../src/modules/routes/route.repository';
 import { InMemoryTripRepository } from '../../src/modules/trips/trip.repository';
 import { InMemoryBoardingRepository } from '../../src/modules/trips/boarding.repository';
+import { InMemoryPaymentRepository } from '../../src/modules/payments/payment.repository';
+import { MockMomoProvider } from '../../src/modules/payments/payment.provider';
 
 async function makeApp(): Promise<FastifyInstance> {
   return buildApp({
@@ -14,6 +16,8 @@ async function makeApp(): Promise<FastifyInstance> {
     routes: new InMemoryRouteRepository(),
     trips: new InMemoryTripRepository(),
     boardings: new InMemoryBoardingRepository(),
+    payments: new InMemoryPaymentRepository(),
+    paymentProvider: new MockMomoProvider(),
     jwt: { secret: 'a'.repeat(32), expiresIn: '1h' },
   });
 }
@@ -318,5 +322,88 @@ describe('QR pass + single active ride', () => {
 
     const bad = await app.inject({ method: 'POST', url: '/pass/verify', payload: { passCode: 'nope' } });
     expect(bad.statusCode).toBe(404);
+  });
+});
+
+describe('Payments (mobile money)', () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    app = await makeApp();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('instant approval activates the subscription and grants tokens', async () => {
+    const token = await authToken(app, 'pay@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    const res = await app.inject({
+      method: 'POST',
+      url: '/payments/checkout',
+      headers: auth,
+      payload: { plan: 'commuter_monthly', phone: '0244123456', network: 'mtn' },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().payment.status).toBe('paid');
+    expect(res.json().subscription.tokenBalance).toBe(100);
+
+    const sub = await app.inject({ method: 'GET', url: '/subscriptions/me', headers: auth });
+    expect(sub.statusCode).toBe(200);
+  });
+
+  it('declined payment (phone ending 11) returns 400 and grants nothing', async () => {
+    const token = await authToken(app, 'decline@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    const res = await app.inject({
+      method: 'POST',
+      url: '/payments/checkout',
+      headers: auth,
+      payload: { plan: 'commuter_monthly', phone: '0244000011', network: 'mtn' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('PAYMENT_FAILED');
+    const sub = await app.inject({ method: 'GET', url: '/subscriptions/me', headers: auth });
+    expect(sub.statusCode).toBe(404);
+  });
+
+  it('pending payment (phone ending 00) is confirmed by the webhook', async () => {
+    const token = await authToken(app, 'pending@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    const checkout = await app.inject({
+      method: 'POST',
+      url: '/payments/checkout',
+      headers: auth,
+      payload: { plan: 'commuter_monthly', phone: '0244120000', network: 'telecel' },
+    });
+    expect(checkout.json().payment.status).toBe('pending');
+    expect(checkout.json().subscription).toBeNull();
+    const reference = checkout.json().payment.reference as string;
+
+    const hook = await app.inject({
+      method: 'POST',
+      url: '/payments/webhook',
+      payload: { reference, status: 'success' },
+    });
+    expect(hook.statusCode).toBe(200);
+    expect(hook.json().status).toBe('paid');
+
+    const sub = await app.inject({ method: 'GET', url: '/subscriptions/me', headers: auth });
+    expect(sub.statusCode).toBe(200);
+    expect(sub.json().tokenBalance).toBe(100);
+  });
+
+  it('rejects checkout when already subscribed', async () => {
+    const token = await authToken(app, 'dupe@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    await app.inject({ method: 'POST', url: '/subscriptions', headers: auth, payload: {} });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/payments/checkout',
+      headers: auth,
+      payload: { plan: 'commuter_monthly', phone: '0244123456', network: 'mtn' },
+    });
+    expect(res.statusCode).toBe(409);
   });
 });

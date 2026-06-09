@@ -36,6 +36,11 @@ export class SubscriptionService {
     return sub;
   }
 
+  /** Like getActive but returns null instead of throwing. */
+  async findActive(userId: string): Promise<Subscription | null> {
+    return this.subscriptions.findActiveByUser(userId);
+  }
+
   // Redeem one token per trip. Guards against missing subscription and zero balance.
   async redeem(userId: string, tokens = 1): Promise<Subscription> {
     if (tokens < 1) {

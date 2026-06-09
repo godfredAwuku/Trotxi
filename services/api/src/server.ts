@@ -14,12 +14,18 @@ import { InMemoryTripRepository } from './modules/trips/trip.repository';
 import { PgTripRepository } from './modules/trips/trip.repository.pg';
 import { InMemoryBoardingRepository } from './modules/trips/boarding.repository';
 import { PgBoardingRepository } from './modules/trips/boarding.repository.pg';
+import { InMemoryPaymentRepository } from './modules/payments/payment.repository';
+import { PgPaymentRepository } from './modules/payments/payment.repository.pg';
+import { MockMomoProvider } from './modules/payments/payment.provider';
 import type { AppDeps } from './app';
 
 async function main(): Promise<void> {
   const env = loadEnv();
 
-  let repos: Pick<AppDeps, 'users' | 'subscriptions' | 'routes' | 'trips' | 'boardings'>;
+  let repos: Pick<
+    AppDeps,
+    'users' | 'subscriptions' | 'routes' | 'trips' | 'boardings' | 'payments'
+  >;
   let isReady: () => Promise<boolean> = async () => true;
   let pool: Pool | undefined;
 
@@ -31,6 +37,7 @@ async function main(): Promise<void> {
       routes: new PgRouteRepository(pool),
       trips: new PgTripRepository(pool),
       boardings: new PgBoardingRepository(pool),
+      payments: new PgPaymentRepository(pool),
     };
     isReady = async () => {
       try {
@@ -48,12 +55,14 @@ async function main(): Promise<void> {
       routes: new InMemoryRouteRepository(),
       trips: new InMemoryTripRepository(),
       boardings: new InMemoryBoardingRepository(),
+      payments: new InMemoryPaymentRepository(),
     };
     console.log('Using in-memory repositories (no DATABASE_URL set)');
   }
 
   const app = await buildApp({
     ...repos,
+    paymentProvider: new MockMomoProvider(),
     jwt: { secret: env.JWT_SECRET, expiresIn: env.JWT_EXPIRES_IN },
     isReady,
     logger: true,
