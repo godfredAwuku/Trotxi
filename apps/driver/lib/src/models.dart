@@ -51,6 +51,34 @@ class Trip {
       );
 }
 
+class Stop {
+  Stop({required this.name, required this.lat, required this.lng, required this.seq});
+  final String name;
+  final double lat;
+  final double lng;
+  final int seq;
+  factory Stop.fromJson(Map<String, dynamic> json) => Stop(
+        name: json['name'] as String,
+        lat: (json['lat'] as num).toDouble(),
+        lng: (json['lng'] as num).toDouble(),
+        seq: json['seq'] as int,
+      );
+}
+
+class RouteDetail {
+  RouteDetail({required this.id, required this.name, required this.stops});
+  final String id;
+  final String name;
+  final List<Stop> stops;
+  factory RouteDetail.fromJson(Map<String, dynamic> json) => RouteDetail(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        stops: (json['stops'] as List<dynamic>)
+            .map((s) => Stop.fromJson(s as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
 /// Result of scanning/looking up a rider's QR pass code.
 class PassVerification {
   PassVerification({

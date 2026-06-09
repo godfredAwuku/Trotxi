@@ -60,6 +60,11 @@ class ApiClient {
     return list.map((j) => Trip.fromJson(j as Map<String, dynamic>)).toList();
   }
 
+  Future<RouteDetail> routeDetail(String routeId) async {
+    final res = await _client.get(_uri('/routes/$routeId'), headers: _headers);
+    return RouteDetail.fromJson(_decode(res) as Map<String, dynamic>);
+  }
+
   Future<void> publishPosition(String tripId, double lat, double lng, {double? bearing}) async {
     final res = await _client.post(
       _uri('/trips/$tripId/position'),
