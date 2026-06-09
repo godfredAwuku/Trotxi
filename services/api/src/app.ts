@@ -34,6 +34,26 @@ export interface AppDeps {
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: deps.logger ?? false });
 
+  // Treat an empty application/json body as {} so bodyless POSTs (e.g. boarding)
+  // don't fail when a client still sends Content-Type: application/json.
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (_req, body, done) => {
+      const text = (body as string).trim();
+      if (text.length === 0) {
+        done(null, {});
+        return;
+      }
+      try {
+        done(null, JSON.parse(text));
+      } catch (err) {
+        (err as { statusCode?: number }).statusCode = 400;
+        done(err as Error, undefined);
+      }
+    },
+  );
+
   // Allow browser clients (Flutter web) to call the API cross-origin.
   await app.register(fastifyCors, { origin: true });
 

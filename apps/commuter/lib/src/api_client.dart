@@ -87,7 +87,11 @@ class ApiClient {
   }
 
   Future<BoardResult> boardTrip(String tripId) async {
-    final res = await _client.post(_uri('/trips/$tripId/board'), headers: _headers);
+    final res = await _client.post(
+      _uri('/trips/$tripId/board'),
+      headers: _headers,
+      body: jsonEncode(const <String, dynamic>{}),
+    );
     return BoardResult.fromJson(_decode(res) as Map<String, dynamic>);
   }
 }

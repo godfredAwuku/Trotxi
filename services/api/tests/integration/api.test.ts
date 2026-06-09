@@ -195,6 +195,21 @@ describe('Mobility: routes, trips, boarding', () => {
     expect((history.json() as unknown[]).length).toBe(1);
   });
 
+  it('boards with an empty JSON body (Flutter client sends Content-Type only)', async () => {
+    const token = await authToken(app, 'emptybody@trotxi.com');
+    const auth = { authorization: `Bearer ${token}` };
+    await app.inject({ method: 'POST', url: '/subscriptions', headers: auth, payload: {} });
+    const trips = (await app.inject({ method: 'GET', url: '/trips' })).json() as Array<{ id: string }>;
+
+    const board = await app.inject({
+      method: 'POST',
+      url: `/trips/${trips[0]!.id}/board`,
+      headers: { ...auth, 'content-type': 'application/json' },
+      payload: '',
+    });
+    expect(board.statusCode).toBe(201);
+  });
+
   it('rejects double-boarding the same trip', async () => {
     const token = await authToken(app, 'double@trotxi.com');
     const auth = { authorization: `Bearer ${token}` };
