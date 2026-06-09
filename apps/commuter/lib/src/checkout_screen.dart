@@ -52,13 +52,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final result = await widget.api.checkout(phone: _phone.text.trim(), network: _network);
       if (!mounted) return;
       if (result.subscription != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: AppColors.primaryDark,
-            content: Text('Payment successful — 100 tokens added'),
-          ),
-        );
-        Navigator.of(context).pop(true);
+        _done('Payment successful — 100 tokens added');
       } else {
         setState(() => _pending =
             'Approve the prompt on your phone to complete payment. This will activate once confirmed.');
@@ -68,6 +62,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  // Dev/test shortcut: grant a subscription without payment for end-to-end testing.
+  Future<void> _useTestSubscription() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.api.subscribe();
+      if (mounted) _done('Test subscription activated — 100 tokens added');
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _done(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(backgroundColor: AppColors.primaryDark, content: Text(message)),
+    );
+    Navigator.of(context).pop(true);
   }
 
   @override
@@ -153,6 +170,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Center(
             child: Text('Secured mobile-money payment',
                 style: TextStyle(color: AppColors.ink.withValues(alpha: 0.45), fontSize: 12)),
+          ),
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton.icon(
+              onPressed: _busy ? null : _useTestSubscription,
+              icon: const Icon(Icons.science_outlined, size: 18),
+              label: const Text('Skip payment — use a test subscription'),
+            ),
+          ),
+          Center(
+            child: Text('For development/testing only',
+                style: TextStyle(color: AppColors.ink.withValues(alpha: 0.4), fontSize: 11)),
           ),
         ],
       ),
