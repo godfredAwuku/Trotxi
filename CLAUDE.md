@@ -176,6 +176,50 @@ trotxi/
 - **Regulatory**: Ghana Data Protection Act 2012 (Act 843), Bank of Ghana payment regs, DVLA driver/vehicle verification. Compliance is architecture, not afterthought.
 - **Data ethics**: Trotxi does not sell personal data. Mobility intelligence built on aggregated, de-identified patterns only.
 
+## Accounts & Services Needed
+
+Grouped by **what unlocks what**. Most of the "test it now" tier is free.
+
+### Tier 1 — Deploy + test on real phones (do this first)
+| Account | Cost | What it's for | Status |
+|---|---|---|---|
+| GitHub | Free | Source + triggers the Render deploy | ✅ have it |
+| Render (or Fly/Railway) | Free tier | Hosts the API + Postgres (the `render.yaml` blueprint) | Sign up |
+| Apple ID | Free | Run the iOS app on your own iPhone (7-day provisioning) | Have one |
+| Apple Developer Program | $99/yr | TestFlight / App Store — let others install on iPhones | When you share it |
+| Google Play Developer | $25 once | Distribute the Android app (optional now) | Optional |
+
+Maps cost nothing — we use OpenStreetMap tiles (no API key).
+
+**Bare minimum to test on your own iPhone this week:** GitHub + Render + free Apple ID.
+
+### Tier 2 — Turn on the real features we built/planned
+| Service | Cost | Unlocks |
+|---|---|---|
+| Paystack or Hubtel | Free signup; ~1.95% per txn; test keys free | Real mobile-money (MTN MoMo, Telecel, AirtelTigo) — replaces the mock |
+| SMS — Arkesel / mNotify / Hubtel (Ghana-local) or Twilio | Pay-per-SMS (pesewas) | Phone OTP login (Ghana is phone-first) |
+| Firebase (FCM) | Free | Push notifications (arrival alerts). iOS push also needs an APNs key from Apple Developer |
+| Sentry | Free tier | Crash/error monitoring |
+
+### Tier 3 — Scale / real-time telemetry (later)
+| Service | Cost | For |
+|---|---|---|
+| Managed Redis (Upstash / Render) | Free tier | Live positions + pub/sub |
+| EMQX (self-host or EMQX Cloud) | Free tier | MQTT GPS ingestion (the Go telemetry path) |
+| Custom domain (Namecheap, etc.) | ~$12/yr | `api.trotxi.app` instead of `…onrender.com` |
+| Always-on Render (web + DB) | ~$14/mo | No cold starts, DB doesn't expire |
+
+### Tier 4 — Ghana commercial/legal (before charging real money)
+- **Business registration** (Registrar General) — required for Paystack/Hubtel **live** keys
+- **Data Protection Commission** registration (Act 843)
+- **Payment compliance** — mostly handled *through* Paystack/Hubtel as the licensed aggregator (you ride their BoG license)
+- **DVLA** — driver/vehicle verification (KYC for onboarding drivers)
+
+### Recommended order
+1. **Now (free):** GitHub + Render → deploy → test on your iPhone with your Apple ID.
+2. **Next:** create a Paystack **test** account → wire real MoMo (sandbox) to test the full payment flow end-to-end.
+3. **Then:** Apple Developer ($99) when you want to hand it to other testers via TestFlight.
+
 ## Team Model
 
 3 engineers + AI agents. AI contributes ~60-70% of code volume (scaffolding, CRUD, integration, tests, docs). The remaining 30-40% is architecture, distributed-systems debugging, security, and production incidents — humans own that.
