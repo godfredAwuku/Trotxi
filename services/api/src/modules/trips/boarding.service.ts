@@ -50,9 +50,6 @@ export class BoardingService {
     if (await this.boardings.findActiveByUser(userId)) {
       throw AppError.conflict('Finish your current ride before boarding another', 'ON_RIDE');
     }
-    if (await this.boardings.exists(userId, tripId)) {
-      throw AppError.conflict('You have already boarded this trip', 'ALREADY_BOARDED');
-    }
 
     // Spend the fare first — this enforces the subscription/balance guards.
     const subscription = await this.subscriptions.redeem(userId, trip.fareTokens);

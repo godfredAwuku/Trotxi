@@ -20,9 +20,6 @@ export class InMemoryBoardingRepository implements BoardingRepository {
   private readonly rows: Boarding[] = [];
 
   async create(input: NewBoarding): Promise<Boarding> {
-    if (await this.exists(input.userId, input.tripId)) {
-      throw AppError.conflict('Already boarded this trip', 'ALREADY_BOARDED');
-    }
     if (await this.findActiveByUser(input.userId)) {
       throw AppError.conflict('You already have an active ride', 'ON_RIDE');
     }

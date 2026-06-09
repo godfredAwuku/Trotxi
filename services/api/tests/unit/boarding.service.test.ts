@@ -54,6 +54,14 @@ describe('BoardingService', () => {
     expect(result.boarding.status).toBe('active');
   });
 
+  it('allows re-boarding the same trip after ending the previous ride', async () => {
+    await subs.subscribe(userId, 'commuter_monthly');
+    await service.board(userId, tripId);
+    await service.completeRide(userId);
+    const again = await service.board(userId, tripId);
+    expect(again.boarding.status).toBe('active');
+  });
+
   it('exposes the active ride and ends it', async () => {
     await subs.subscribe(userId, 'commuter_monthly');
     await service.board(userId, tripId);
