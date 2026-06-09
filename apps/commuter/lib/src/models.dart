@@ -143,6 +143,36 @@ class RouteDetail {
       );
 }
 
+class BoardingHistoryItem {
+  BoardingHistoryItem({
+    required this.id,
+    required this.routeName,
+    required this.origin,
+    required this.destination,
+    required this.tokensSpent,
+    required this.status,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String? routeName;
+  final String? origin;
+  final String? destination;
+  final int tokensSpent;
+  final String status;
+  final DateTime createdAt;
+
+  factory BoardingHistoryItem.fromJson(Map<String, dynamic> json) => BoardingHistoryItem(
+        id: json['id'] as String,
+        routeName: json['routeName'] as String?,
+        origin: json['origin'] as String?,
+        destination: json['destination'] as String?,
+        tokensSpent: json['tokensSpent'] as int,
+        status: json['status'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
+      );
+}
+
 /// Current active ride from GET /boardings/active. Null when the rider is idle.
 class ActiveRide {
   ActiveRide({required this.boardingId, required this.trip});

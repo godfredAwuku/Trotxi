@@ -16,6 +16,17 @@ export interface ActiveRide {
   trip: Trip | null;
 }
 
+export interface BoardingHistoryItem {
+  id: string;
+  tripId: string;
+  routeName: string | null;
+  origin: string | null;
+  destination: string | null;
+  tokensSpent: number;
+  status: Boarding['status'];
+  createdAt: Date;
+}
+
 export class BoardingService {
   constructor(
     private readonly trips: TripRepository,
@@ -70,7 +81,23 @@ export class BoardingService {
     return completed;
   }
 
-  async history(userId: string): Promise<Boarding[]> {
-    return this.boardings.listByUser(userId);
+  /** Boarding history enriched with the route details of each trip. */
+  async history(userId: string): Promise<BoardingHistoryItem[]> {
+    const rows = await this.boardings.listByUser(userId);
+    return Promise.all(
+      rows.map(async (b) => {
+        const trip = await this.trips.findById(b.tripId);
+        return {
+          id: b.id,
+          tripId: b.tripId,
+          routeName: trip?.routeName ?? null,
+          origin: trip?.origin ?? null,
+          destination: trip?.destination ?? null,
+          tokensSpent: b.tokensSpent,
+          status: b.status,
+          createdAt: b.createdAt,
+        };
+      }),
+    );
   }
 }

@@ -192,7 +192,11 @@ describe('Mobility: routes, trips, boarding', () => {
     expect(board.json().trip.id).toBe(trip.id);
 
     const history = await app.inject({ method: 'GET', url: '/boardings/me', headers: auth });
-    expect((history.json() as unknown[]).length).toBe(1);
+    const items = history.json() as Array<{ routeName: string; tokensSpent: number; status: string }>;
+    expect(items.length).toBe(1);
+    expect(typeof items[0]!.routeName).toBe('string');
+    expect(items[0]!.tokensSpent).toBe(trip.fareTokens);
+    expect(items[0]!.status).toBe('active');
   });
 
   it('boards with an empty JSON body (Flutter client sends Content-Type only)', async () => {

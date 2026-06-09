@@ -113,4 +113,10 @@ class ApiClient {
     );
     _decode(res);
   }
+
+  Future<List<BoardingHistoryItem>> boardingHistory() async {
+    final res = await _client.get(_uri('/boardings/me'), headers: _headers);
+    final list = _decode(res) as List<dynamic>;
+    return list.map((j) => BoardingHistoryItem.fromJson(j as Map<String, dynamic>)).toList();
+  }
 }

@@ -4,6 +4,7 @@ import 'api_client.dart';
 import 'boarding_pass_screen.dart';
 import 'models.dart';
 import 'theme.dart';
+import 'trip_history_screen.dart';
 import 'trips_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -149,6 +150,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: 'Browse trips',
                       subtitle: onRide ? 'Finish your ride to board another' : 'Find and board upcoming rides',
                       onTap: _openTrips,
+                    ),
+                    const SizedBox(height: 10),
+                    _ActionTile(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'Trip history',
+                      subtitle: 'Your recent boardings',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => TripHistoryScreen(api: widget.api)),
+                      ),
                     ),
                     const SizedBox(height: 10),
                     const _ActionTile(icon: Icons.map_outlined, title: 'Live map', subtitle: 'Track your vehicle in real time (coming soon)'),
