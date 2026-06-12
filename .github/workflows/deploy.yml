@@ -1,0 +1,70 @@
+name: Deploy
+
+# Continuous deployment: runs after CI completes on main.
+# main (CI green) → staging deploys automatically → smoke test
+#                 → production waits for manual approval (GitHub environment)
+#
+# Dormant until the DEPLOY_ENABLED repo variable is "true" (set it after
+# connecting the Render blueprint and adding RENDER_API_KEY — see docs/DEPLOY.md).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Deploys queue rather than cancel: every green commit ships in order.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    name: Deploy staging (Render)
+    if: github.event.workflow_run.conclusion == 'success' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy and wait until live
+        run: .github/scripts/render-deploy.sh
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ vars.RENDER_STAGING_SERVICE_ID }}
+
+      - name: Smoke test
+        run: |
+          curl -fsS --retry 5 --retry-delay 5 "${{ vars.STAGING_URL }}/healthz"
+          curl -fsS "${{ vars.STAGING_URL }}/readyz"
+
+  production:
+    name: Deploy production (Render)
+    needs: staging
+    # Skipped until the production service exists (see render.yaml).
+    if: vars.RENDER_PRODUCTION_SERVICE_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # The production environment requires a manual approval in GitHub before
+    # this job starts (Settings → Environments → production → reviewers).
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy and wait until live
+        run: .github/scripts/render-deploy.sh
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ vars.RENDER_PRODUCTION_SERVICE_ID }}
+
+      - name: Smoke test
+        run: |
+          curl -fsS --retry 5 --retry-delay 5 "${{ vars.PRODUCTION_URL }}/healthz"
+          curl -fsS "${{ vars.PRODUCTION_URL }}/readyz"

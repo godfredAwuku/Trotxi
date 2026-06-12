@@ -1,16 +1,19 @@
 # Render blueprint for the Trotxi API + Postgres.
-# Deploy: render.com → New → Blueprint → connect this repo. Render reads this file,
-# provisions a Postgres database and the API web service, and wires DATABASE_URL.
+#
+# One-time setup: render.com → New → Blueprint → connect this repo → Apply.
+# Day-to-day deploys are driven by GitHub Actions (.github/workflows/deploy.yml):
+# CI green on main → staging deploys automatically → production after a manual
+# approval in GitHub. autoDeploy is therefore off — Actions calls the Render API.
 databases:
-  - name: trotxi-db
+  - name: trotxi-db-staging
     databaseName: trotxi
     user: trotxi
-    plan: free
+    plan: free # NB: free Postgres expires ~30 days after creation
     region: frankfurt # closest Render region to Ghana
 
 services:
   - type: web
-    name: trotxi-api
+    name: trotxi-api-staging
     runtime: docker
     repo: https://github.com/godfredAwuku/Trotxi
     branch: main
@@ -20,7 +23,7 @@ services:
     plan: free
     region: frankfurt
     healthCheckPath: /healthz
-    autoDeploy: true
+    autoDeploy: false # GitHub Actions triggers deploys after CI passes
     envVars:
       - key: NODE_ENV
         value: production
@@ -34,5 +37,43 @@ services:
         value: "true"
       - key: DATABASE_URL
         fromDatabase:
-          name: trotxi-db
+          name: trotxi-db-staging
           property: connectionString
+
+  # ---- Production (uncomment when going live) ----
+  # Needs a paid Postgres plan so data doesn't expire. After applying, set the
+  # RENDER_PRODUCTION_SERVICE_ID + PRODUCTION_URL GitHub variables to activate
+  # the production stage of deploy.yml (it is skipped until then).
+  #
+  # - type: web
+  #   name: trotxi-api
+  #   runtime: docker
+  #   repo: https://github.com/godfredAwuku/Trotxi
+  #   branch: main
+  #   rootDir: services/api
+  #   dockerfilePath: ./Dockerfile
+  #   dockerContext: .
+  #   plan: starter
+  #   region: frankfurt
+  #   healthCheckPath: /healthz
+  #   autoDeploy: false
+  #   envVars:
+  #     - key: NODE_ENV
+  #       value: production
+  #     - key: JWT_SECRET
+  #       generateValue: true
+  #     - key: JWT_EXPIRES_IN
+  #       value: 7d
+  #     - key: SEED_ON_START
+  #       value: "false" # never seed production
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         name: trotxi-db-production
+  #         property: connectionString
+  #
+  # …and add under `databases:`
+  # - name: trotxi-db-production
+  #   databaseName: trotxi
+  #   user: trotxi
+  #   plan: basic-256mb
+  #   region: frankfurt

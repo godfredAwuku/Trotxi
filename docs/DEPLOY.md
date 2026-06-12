@@ -3,32 +3,64 @@
 This gets the backend off `localhost` and onto a public URL so the mobile apps
 work on **real phones** (in Accra or anywhere).
 
-The repo ships a production `Dockerfile` (`services/api/Dockerfile`) and a Render
-blueprint (`render.yaml`) that provisions Postgres + the API in one step.
+The repo ships a production `Dockerfile` (`services/api/Dockerfile`), a Render
+blueprint (`render.yaml`) that provisions Postgres + the API in one step, and a
+**CD pipeline** (`.github/workflows/deploy.yml`) that ships every green commit.
 
-## Option A — Render (one-click blueprint, recommended)
+## How CD works
+
+```
+push / merge to main
+  → CI: api + e2e + flutter ×2 (all must pass — branch protection)
+  → Deploy workflow fires on CI success:
+      staging  — deploys automatically via the Render API, waits until live,
+                 smoke-tests /healthz + /readyz
+      production — waits for a manual approval in GitHub (environment
+                 "production"), then deploys + smoke-tests the same way
+```
+
+- Deploys **queue in order** (no cancellation), so every green commit ships.
+- The pipeline is **dormant** until the `DEPLOY_ENABLED` repo variable is
+  `true` — flip it after the one-time setup below.
+- The production stage is **skipped** until `RENDER_PRODUCTION_SERVICE_ID` is
+  set (uncomment the production block in `render.yaml` when going live).
+
+## One-time setup (≈15 minutes)
 
 **Prereqs:** a free [render.com](https://render.com) account; this repo on GitHub (done).
 
-1. Render Dashboard → **New** → **Blueprint**.
-2. Connect the **`godfredAwuku/Trotxi`** repo. Render detects `render.yaml`.
-3. Click **Apply**. Render then:
-   - creates a free **Postgres** (`trotxi-db`) in Frankfurt (closest region to Ghana),
-   - builds the API from `services/api/Dockerfile`,
-   - generates a strong `JWT_SECRET`,
-   - wires `DATABASE_URL` automatically,
-   - runs migrations and **seeds demo routes/trips** on first boot (`SEED_ON_START=true`).
-4. Wait for the deploy to go green, then copy the service URL, e.g.
-   `https://trotxi-api.onrender.com`.
-5. **Important:** in the `trotxi-api` service → **Environment**, set
-   `SEED_ON_START` = `false` and save. (Otherwise every restart re-seeds and wipes
-   rider boardings.)
+1. Render Dashboard → **New** → **Blueprint** → connect **`godfredAwuku/Trotxi`**
+   → **Apply**. Render creates the free Postgres (`trotxi-db-staging`) and the
+   `trotxi-api-staging` web service (Frankfurt, closest region to Ghana), builds
+   the Docker image, generates `JWT_SECRET`, wires `DATABASE_URL`, migrates and
+   seeds on first boot.
+2. After the first deploy goes green: service → **Environment** → set
+   `SEED_ON_START=false` (otherwise restarts re-seed and wipe rider boardings).
+3. Render → **Account Settings → API Keys** → create a key, then:
+   ```bash
+   gh secret set RENDER_API_KEY -R godfredAwuku/Trotxi        # paste the key
+   ```
+4. Copy the staging service id (`srv-…`, shown in the service URL/settings) and
+   the public URL, then:
+   ```bash
+   gh variable set RENDER_STAGING_SERVICE_ID -R godfredAwuku/Trotxi --body "srv-..."
+   gh variable set STAGING_URL -R godfredAwuku/Trotxi --body "https://trotxi-api-staging.onrender.com"
+   gh variable set DEPLOY_ENABLED -R godfredAwuku/Trotxi --body "true"
+   ```
+5. Done. The next merge to main deploys staging automatically. (GitHub
+   environments `staging` and `production` already exist; production requires
+   your approval before its job runs.)
 
-**Verify:**
+**Going live later:** uncomment the production blocks in `render.yaml`, re-apply
+the blueprint, then set `RENDER_PRODUCTION_SERVICE_ID` and `PRODUCTION_URL`
+variables. From then on every staging deploy is followed by an approval gate
+and a production deploy.
+
+**Verify staging:**
 ```bash
-curl https://trotxi-api.onrender.com/healthz     # {"status":"ok",...}
-curl https://trotxi-api.onrender.com/trips       # demo trips
-# or open https://trotxi-api.onrender.com/docs in a browser
+curl https://trotxi-api-staging.onrender.com/healthz   # {"status":"ok",...}
+curl https://trotxi-api-staging.onrender.com/trips     # demo trips
+# or open https://trotxi-api-staging.onrender.com/docs in a browser
 ```
 
 ## Point the apps at it
@@ -37,7 +69,7 @@ Run either app against the deployed API with a compile-time define:
 
 ```bash
 cd apps/commuter   # or apps/driver
-flutter run --dart-define=API_BASE_URL=https://trotxi-api.onrender.com
+flutter run --dart-define=API_BASE_URL=https://trotxi-api-staging.onrender.com
 ```
 
 For release builds (TestFlight / Play), pass the same `--dart-define` to
