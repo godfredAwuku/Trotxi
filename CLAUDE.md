@@ -82,7 +82,7 @@ trotxi/
 
 ### API service (services/api)
 - **34 tests passing** (unit + integration via fastify.inject)
-- Typecheck clean (strict mode), lint clean (ESLint flat config), coverage gate 70% lines
+- Typecheck clean (strict mode), lint clean (ESLint flat config), coverage gate 80% lines (logic layer; pg adapters + db scripts covered by e2e instead)
 - Builds via tsup → dist/server.js
 - Runs with **in-memory repositories by default** (zero infra) OR **Postgres** when `DATABASE_URL` is set — repo choice happens in server.ts
 - Swagger UI at /docs; `GET /` returns service info
@@ -156,7 +156,7 @@ trotxi/
 - **Passwords**: Node built-in scrypt (no native deps). Hash format: `scrypt$<saltHex>$<hashHex>`.
 - **JWT**: jsonwebtoken. Claims: { sub, email, role }. Auth guard in lib/auth.guard.ts.
 - **No .js extensions** in imports (moduleResolution: Bundler; tsx/vitest/tsup all resolve correctly).
-- **Tests**: vitest. Unit tests for services, integration tests via fastify.inject(). Coverage gate: 70% lines.
+- **Tests**: vitest. Unit tests for services, integration tests via fastify.inject(). Coverage gate: 80% lines on the logic layer — *.pg.ts repos and src/db/** are excluded (exercised by the e2e suite against real Postgres).
 - **Build**: tsup (esbuild-based, ESM output). Dev: tsx watch.
 
 ### Go (Geo)

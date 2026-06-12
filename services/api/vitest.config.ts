@@ -8,12 +8,14 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['src/**/*.ts'],
-      exclude: ['src/server.ts', 'src/db/migrate.ts', 'src/**/*.routes.ts'],
+      // *.pg.ts repositories and db/ scripts only run against a real Postgres;
+      // the e2e suite (e2e/) exercises them. Unit coverage gates the logic layer.
+      exclude: ['src/server.ts', 'src/db/**', 'src/**/*.routes.ts', 'src/**/*.pg.ts'],
       thresholds: {
-        lines: 70,
-        functions: 70,
-        branches: 70,
-        statements: 70,
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
       },
     },
   },
