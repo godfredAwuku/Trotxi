@@ -1,0 +1,16 @@
+{
+  "name": "@trotxi/e2e",
+  "private": true,
+  "description": "Black-box end-to-end tests: real HTTP against the API running on Postgres.",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.1"
+  }
+}

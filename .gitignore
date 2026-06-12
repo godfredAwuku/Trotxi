@@ -9,6 +9,14 @@ coverage/
 .env
 .env.local
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
+# Generated analysis artifacts
+.understand-anything/
+
 # Vercel
 .vercel
 

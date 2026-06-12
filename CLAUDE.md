@@ -65,9 +65,11 @@ trotxi/
 │   └── commuter/     # ✅ Flutter app — auth, subscribe, token balance, browse + board trips
 │       └── lib/src/  # config (platform-aware API URL), api_client, models, theme, screens
 ├── infra/docker/     # ✅ docker-compose: Postgres+PostGIS (5432), Redis (6379), EMQX (1883/18083)
+├── e2e/              # ✅ Playwright black-box suite — real HTTP vs API on its own trotxi_e2e DB
+│   └── tests/        # health, auth, payments, commuter journey, boarding guards, driver
 ├── .github/workflows/
-│   └── ci.yml        # ✅ Node 22 — typecheck, lint, test:coverage, build for services/api
-├── Makefile          # ✅ `make help` lists all tasks (up/down, dev, test, migrate, seed…)
+│   └── ci.yml        # ✅ api (typecheck/lint/coverage/build), e2e (PostGIS service), flutter ×2 (analyze/test)
+├── Makefile          # ✅ `make help` lists all tasks (up/down, dev, test, migrate, seed, e2e…)
 ├── README.md         # ✅ quick start (in-memory + Postgres), endpoint table
 │
 │   # 🔭 Planned, not yet created:
@@ -96,9 +98,16 @@ trotxi/
 - Platform-aware API base URL (localhost for macOS/iOS/web/desktop, 10.0.2.2 for Android emulator; override via `--dart-define=API_BASE_URL=...`)
 - macOS network-client entitlement set; runs on macOS desktop and Chrome web
 
+### End-to-end tests (e2e/)
+- **25 Playwright tests passing** (~3s) — black-box HTTP against the API booted on Postgres
+- Harness: global-setup drops/recreates a dedicated `trotxi_e2e` DB (dev data untouched), runs migrate + seed, then Playwright's webServer boots the API on port 3100 with env-injected `DATABASE_URL` (loadEnvFile never overrides pre-set vars)
+- Coverage: health/docs, auth lifecycle, mock-MoMo determinism (instant/declined/pending+webhook), full commuter journey (subscribe → browse → board → ON_RIDE guard → QR pass verify → complete → re-board → history), boarding guards (no sub, no tokens, unknown trip), driver position reporting (role guard, live vs simulated source)
+- Run: `make up` once, then `make e2e` (or `make e2e-ui`); CI runs it on every push against a PostGIS service container
+
 ### Infrastructure
 - Docker Compose: Postgres+PostGIS (5432), Redis (6379), EMQX (1883/18083). Postgres exercised by the API; Redis + EMQX are running but **not yet consumed** (await the geo/telemetry path)
-- CI: single GitHub Actions job (Node 22) — typecheck, lint, test:coverage, build for services/api
+- CI: four GitHub Actions jobs on every push/PR to main — `api` (Node 22: typecheck, lint, test:coverage, build), `e2e` (Playwright vs PostGIS service container, report uploaded on failure), `flutter` matrix ×2 (analyze + test for commuter and driver). Concurrency cancels superseded PR runs; jobs have timeouts; workflow has read-only token permissions
+- Branch protection on `main` (repo is public): merging requires all four checks green on an up-to-date branch + a PR with conversations resolved; force pushes and deletions blocked. Admins (owner) may still push directly — flip `enforce_admins` when the team onboards. PR template at .github/pull_request_template.md
 - `.claude/settings.json` holds a dev-command permission allowlist
 - Note: conventional-commits/CODEOWNERS/PR-template/husky and the staged deploy pipeline are conventions we follow but are **not yet configured** in the repo
 

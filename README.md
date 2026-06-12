@@ -85,6 +85,22 @@ make migrate && make seed   # schema + demo Accra routes/trips
 make dev
 ```
 
+### End-to-end tests (Playwright)
+
+Black-box journeys over real HTTP — register → pay (mock MoMo) → board →
+verify QR pass → end ride → history — against the API running on Postgres.
+The harness drops/recreates its own `trotxi_e2e` database, migrates, seeds,
+and boots the API on port 3100, so dev data and the dev server are untouched.
+
+```bash
+make up                # Postgres must be running
+make install-e2e       # once
+make e2e               # run the suite (or `make e2e-ui` for the UI runner)
+```
+
+Tests live in [`e2e/tests/`](e2e/tests). CI runs the suite on every push
+against a fresh PostGIS container.
+
 ## Common tasks
 
 Run `make help` for the full list:
@@ -96,4 +112,5 @@ make dev                     # API watch mode
 make test / coverage         # API tests
 make check                   # typecheck + lint + test
 make migrate                 # DB migrations (needs DATABASE_URL)
+make e2e                     # Playwright end-to-end suite
 ```

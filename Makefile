@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := help
 COMPOSE := docker compose -f infra/docker/docker-compose.yml
 API := services/api
+E2E := e2e
 
 .PHONY: help
 help: ## List available tasks
@@ -59,3 +60,16 @@ seed: ## Seed demo routes/trips/vehicles (requires DATABASE_URL)
 
 .PHONY: check
 check: typecheck lint test ## Run all API quality gates
+
+## ---- End-to-end (e2e) ----
+.PHONY: install-e2e
+install-e2e: ## Install e2e test dependencies
+	cd $(E2E) && npm install
+
+.PHONY: e2e
+e2e: ## Run Playwright e2e suite (needs Postgres up; uses its own trotxi_e2e DB)
+	cd $(E2E) && npm test
+
+.PHONY: e2e-ui
+e2e-ui: ## Run the e2e suite in Playwright's interactive UI
+	cd $(E2E) && npm run test:ui
